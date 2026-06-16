@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Firmanet",
+    "slug": "firmanet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/firmanet-logo.jpeg",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#F7F8FB",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.firmanet.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Firmanet needs your location to show nearby incidents and send SOS alerts to your trusted contacts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Firmanet needs your location to send real-time safety alerts and enable emergency SOS features.",
+        "NSLocationAlwaysUsageDescription": "Firmanet needs your location to send real-time safety alerts and enable emergency SOS features."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F8FB"
+      },
+      "package": "com.firmanet.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "firmanet"
+      }
+    }
+  }
+}
