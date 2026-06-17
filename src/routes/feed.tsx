@@ -126,7 +126,7 @@ const CATEGORIES: IncidentCategory[] = [
  */
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   const token =
-    process.env.VITE_MAPBOX_PUBLIC_TOKEN ??
+    import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN ??
     process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
     "";
   if (!token) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;

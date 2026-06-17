@@ -29,7 +29,7 @@ export function useUserLocation(): UseUserLocationReturn {
   // Load Mapbox token once
   useEffect(() => {
     const t =
-      process.env.VITE_MAPBOX_PUBLIC_TOKEN ??
+      import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN ??
       process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
       process.env.MAPBOX_PUBLIC_TOKEN ??
       "";
