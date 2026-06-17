@@ -33,7 +33,7 @@ function SosPage() {
           const lng = pos.coords.longitude;
           setUserCoords({ lat, lng });
           // Attempt reverse geocoding
-          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? process.env.MAPBOX_PUBLIC_TOKEN ?? "";
+          const token = process.env.VITE_MAPBOX_PUBLIC_TOKEN ?? process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
           if (token) {
             fetch(
               `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,

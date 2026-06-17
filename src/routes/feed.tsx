@@ -120,6 +120,30 @@ const CATEGORIES: IncidentCategory[] = [
   { key: "other", label: "Other", type: "observation", Icon: HelpCircle, tint: "text-muted-foreground" },
 ];
 
+/**
+ * Reverse geocode coordinates to a human-readable place name using Mapbox.
+ * Returns the place name on success, or the raw coordinate string as fallback.
+ */
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const token =
+    process.env.VITE_MAPBOX_PUBLIC_TOKEN ??
+    process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
+    "";
+  if (!token) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  try {
+    const res = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
+    );
+    const data = await res.json();
+    if (data?.features?.[0]?.place_name) {
+      return data.features[0].place_name;
+    }
+  } catch {
+    // ignore — fall back to coordinates
+  }
+  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
 function CreateModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState(0);
   const [cat, setCat] = useState<IncidentCategory | null>(null);
@@ -133,26 +157,15 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setCoords({ lat, lng });
-          // Show coordinates immediately as fallback
+          // Show coordinates immediately as quick fallback
           setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
           // Attempt reverse geocoding for a meaningful location name
-          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? process.env.MAPBOX_PUBLIC_TOKEN ?? "";
-          if (token) {
-            fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
-            )
-              .then((r) => r.json())
-              .then((data) => {
-                if (data?.features?.[0]?.place_name) {
-                  setLocation(data.features[0].place_name);
-                }
-              })
-              .catch(() => {});
-          }
+          const name = await reverseGeocode(lat, lng);
+          setLocation(name);
         },
         () => {},
         { timeout: 4000 },
