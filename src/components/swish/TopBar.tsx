@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Bell, MapPin, User } from "lucide-react";
 import { Logo } from "./Logo";
 import { useUserLocation } from "@/hooks/useUserLocation";
+import { lightTap } from "@/core/haptics";
 
 export function TopBar() {
   const { location } = useUserLocation();
@@ -18,6 +19,7 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         <Link
           to="/notifications"
+          onClick={() => lightTap()}
           aria-label="Alerts"
           className="relative flex h-10 w-10 items-center justify-center rounded-full bg-surface shadow-soft"
         >
@@ -26,6 +28,7 @@ export function TopBar() {
         </Link>
         <Link
           to="/profile"
+          onClick={() => lightTap()}
           aria-label="Profile"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft"
         >

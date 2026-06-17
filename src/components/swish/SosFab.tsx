@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { Siren } from "lucide-react";
+import { heavyTap } from "@/core/haptics";
 
 export function SosFab() {
   const [pos, setPos] = useState(() => {
@@ -66,7 +67,7 @@ export function SosFab() {
     >
       <Link
         to="/sos"
-        onClick={(e) => { if (moved.current) e.preventDefault(); }}
+        onClick={(e) => { if (moved.current) e.preventDefault(); else heavyTap(); }}
         aria-label="Activate SOS"
         className="pointer-events-auto relative flex h-16 w-16 items-center justify-center rounded-full bg-danger text-danger-foreground animate-sos-pulse select-none"
       >

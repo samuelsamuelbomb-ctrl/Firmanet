@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Plus, Map, Siren, Users } from "lucide-react";
+import { lightTap } from "@/core/haptics";
 
 const actions = [
   { label: "Report", icon: Plus, to: "/feed", tone: "bg-mint text-mint-foreground" },
@@ -16,6 +17,7 @@ export function QuickActions() {
           <Link
             key={label}
             to={to}
+            onClick={() => lightTap()}
             className="flex flex-col items-center gap-1.5 rounded-2xl py-2.5 active:scale-95 transition-transform"
           >
             <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone} shadow-soft`}>

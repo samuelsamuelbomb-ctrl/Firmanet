@@ -5,6 +5,7 @@ import { play, stopSos } from "@/lib/swish-sound";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { SOS_CIRCLE_SIZE } from "@/core/constants";
+import { lightTap, heavyTap, successNotify } from "@/core/haptics";
 
 export const Route = createFileRoute("/sos")({
   head: () => ({
@@ -101,14 +102,17 @@ function SosPage() {
   const startHold = () => {
     setHold(0);
     setStage("holding");
+    heavyTap();
   };
   const cancel = () => {
     setHold(0);
     setStage("ready");
     stopSos();
+    lightTap();
   };
   const endEmergency = () => {
     setDeact(true);
+    lightTap();
   };
 
   const confirmDeactivate = () => {
@@ -119,6 +123,7 @@ function SosPage() {
         .update({ status: "resolved", ended_at: new Date().toISOString() })
         .eq("id", sessionId);
     }
+    heavyTap();
     navigate({ to: "/" });
   };
 
@@ -176,7 +181,7 @@ function SosPage() {
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate({ to: "/" })}
+            onClick={() => { lightTap(); navigate({ to: "/" }); }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-surface shadow-soft"
             aria-label="Close"
           >
@@ -243,7 +248,7 @@ function SosPage() {
               Cancel
             </button>
             <button
-              onClick={() => setStage("active")}
+              onClick={() => { heavyTap(); successNotify(); setStage("active"); }}
               className="rounded-2xl bg-danger py-4 font-bold text-danger-foreground shadow-pop"
             >
               Send alert
@@ -326,11 +331,11 @@ function DeactivateModal({ onCancel, onConfirm }: { onCancel: () => void; onConf
         )}
 
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <button onClick={onCancel} className="rounded-2xl bg-muted py-3.5 text-sm font-semibold">
+          <button onClick={() => { lightTap(); onCancel(); }} className="rounded-2xl bg-muted py-3.5 text-sm font-semibold">
             Stay active
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => { heavyTap(); onConfirm(); }}
             disabled={!ready || !match}
             className="rounded-2xl bg-danger py-3.5 text-sm font-bold text-danger-foreground shadow-pop disabled:opacity-40"
           >

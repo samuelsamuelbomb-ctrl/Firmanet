@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Shield, Mail, Lock, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { lightTap, mediumTap } from "@/core/haptics";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -75,10 +76,10 @@ function AuthPage() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10">
         <div className="flex items-center justify-between">
-          <Link to="/onboarding" className="text-xs font-semibold text-muted-foreground">
+          <Link to="/onboarding" onClick={() => lightTap()} className="text-xs font-semibold text-muted-foreground">
             About Firmanet
           </Link>
-          <Link to="/" className="text-xs font-semibold text-muted-foreground">
+          <Link to="/" onClick={() => lightTap()} className="text-xs font-semibold text-muted-foreground">
             Skip
           </Link>
         </div>
@@ -97,7 +98,7 @@ function AuthPage() {
           </div>
         </div>
 
-        <form onSubmit={handleEmail} className="mt-8 space-y-3">
+        <form onSubmit={(e) => { mediumTap(); handleEmail(e); }} className="mt-8 space-y-3">
           {mode === "signup" && (
             <Field
               icon={<Mail className="h-4 w-4" />}
@@ -143,7 +144,7 @@ function AuthPage() {
         </div>
 
         <button
-          onClick={handleGoogle}
+          onClick={(e) => { lightTap(); handleGoogle(); }}
           disabled={busy}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3.5 text-sm font-semibold shadow-soft active:scale-[0.98] disabled:opacity-50"
         >
@@ -152,7 +153,7 @@ function AuthPage() {
         </button>
 
         <button
-          onClick={() => setMode((m) => (m === "signin" ? "signup" : "signin"))}
+          onClick={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); }}
           className="mt-8 text-center text-xs text-muted-foreground"
         >
           {mode === "signin" ? (

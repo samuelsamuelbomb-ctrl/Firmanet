@@ -1,4 +1,5 @@
 import { Link, type LinkProps } from "@tanstack/react-router";
+import { lightTap } from "@/core/haptics";
 
 export function SectionHeader({
   title,
@@ -15,7 +16,7 @@ export function SectionHeader({
         {title}
       </h3>
       {action && to && (
-        <Link to={to} className="text-xs font-semibold text-primary">
+        <Link to={to} onClick={() => lightTap()} className="text-xs font-semibold text-primary">
           {action}
         </Link>
       )}
