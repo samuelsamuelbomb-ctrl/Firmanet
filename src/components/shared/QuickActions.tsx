@@ -7,6 +7,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Siren, MessageCircle, Map, Shield } from "lucide-react-native";
+import { lightTap } from "../../core/haptics";
 
 const ACTIONS = [
   { label: "SOS", icon: Siren, route: "SOS", color: "#E63946", bg: "#FEE2E2" },
@@ -21,13 +22,13 @@ export function QuickActions() {
   return (
     <View style={styles.container}>
       {ACTIONS.map((a) => (
-        <TouchableOpacity
-          key={a.label}
-          style={styles.item}
-          onPress={() => navigation.navigate(a.route)}
-          activeOpacity={0.7}
-          accessibilityLabel={a.label}
-        >
+          <TouchableOpacity
+            key={a.label}
+            style={styles.item}
+            onPress={() => { lightTap(); navigation.navigate(a.route); }}
+            activeOpacity={0.7}
+            accessibilityLabel={a.label}
+          >
           <View style={[styles.iconWrap, { backgroundColor: a.bg }]}>
             <a.icon size={22} color={a.color} strokeWidth={2.2} />
           </View>

@@ -21,6 +21,7 @@ import { SectionHeader } from "../components/shared/SectionHeader";
 import { SponsorStrip } from "../components/shared/SponsorCard";
 import { useSignals, useSignalsRealtime } from "../core/signalStore";
 import type { Intensity } from "../core/types";
+import { mediumTap } from "../core/haptics";
 
 const INTENSITY_CYCLE: Intensity[] = ["calm", "warn", "danger"];
 
@@ -30,8 +31,10 @@ export default function HomeScreen() {
   useSignalsRealtime();
   const first = useRef(true);
 
-  const cycle = () =>
+  const cycle = () => {
+    mediumTap();
     setIntensity((cur) => INTENSITY_CYCLE[(INTENSITY_CYCLE.indexOf(cur) + 1) % 3]);
+  };
 
   // Sound effect on intensity change (skip first render)
   useEffect(() => {

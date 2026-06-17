@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MapPin, Clock, Users } from "lucide-react-native";
 import type { Signal } from "../../core/types";
+import { lightTap } from "../../core/haptics";
 
 interface SignalCardProps {
   signal: Signal;
@@ -19,7 +20,7 @@ export function SignalCard({ signal }: SignalCardProps) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => navigation.navigate("IncidentDetail", { id: signal.id })}
+      onPress={() => { lightTap(); navigation.navigate("IncidentDetail", { id: signal.id }); }}
       activeOpacity={0.7}
     >
       <View style={styles.header}>

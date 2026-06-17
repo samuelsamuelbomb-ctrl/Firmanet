@@ -21,6 +21,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Shield, Mail, Lock, ArrowRight } from "lucide-react-native";
 import { useAuth } from "../context/AuthContext";
+import { lightTap, mediumTap } from "../core/haptics";
 
 type AuthMode = "signin" | "signup";
 
@@ -80,10 +81,10 @@ export default function AuthScreen() {
         >
           {/* Top links */}
           <View style={styles.topLinks}>
-            <TouchableOpacity onPress={() => navigation.navigate("Onboarding")}>
+            <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("Onboarding"); }}>
               <Text style={styles.link}>About Firmanet</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.replace("MainTabs")}>
+            <TouchableOpacity onPress={() => { lightTap(); navigation.replace("MainTabs"); }}>
               <Text style={styles.link}>Skip</Text>
             </TouchableOpacity>
           </View>
@@ -135,7 +136,7 @@ export default function AuthScreen() {
             )}
             <TouchableOpacity
               style={styles.submitBtn}
-              onPress={handleEmail}
+              onPress={() => { mediumTap(); handleEmail(); }}
               disabled={busy}
               activeOpacity={0.8}
             >
@@ -162,7 +163,7 @@ export default function AuthScreen() {
           {/* Google */}
           <TouchableOpacity
             style={styles.googleBtn}
-            onPress={handleGoogle}
+            onPress={() => { lightTap(); handleGoogle(); }}
             disabled={busy}
             activeOpacity={0.8}
           >
@@ -172,7 +173,7 @@ export default function AuthScreen() {
 
           {/* Toggle mode */}
           <TouchableOpacity
-            onPress={() => setMode((m) => (m === "signin" ? "signup" : "signin"))}
+            onPress={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); }}
             style={styles.toggleBtn}
           >
             <Text style={styles.toggleText}>

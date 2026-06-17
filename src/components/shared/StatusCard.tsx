@@ -7,6 +7,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Shield, ShieldAlert, ShieldCheck } from "lucide-react-native";
 import type { Intensity } from "../../core/types";
+import { mediumTap } from "../../core/haptics";
 
 const STATUS_MAP: Record<Intensity, { label: string; sub: string; bg: string; icon: typeof Shield }> = {
   calm:   { label: "All clear", sub: "No incidents reported nearby", bg: "#D8F3DC", icon: ShieldCheck },
@@ -25,7 +26,7 @@ export function StatusCard({ intensity, onCycle }: StatusCardProps) {
   return (
     <TouchableOpacity
       style={[styles.card, { backgroundColor: s.bg }]}
-      onPress={onCycle}
+      onPress={() => { mediumTap(); onCycle(); }}
       activeOpacity={0.7}
       accessibilityLabel={`Status: ${s.label}. Tap to cycle.`}
     >

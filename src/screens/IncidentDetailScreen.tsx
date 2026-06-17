@@ -13,6 +13,7 @@ import { TrustBar } from "../components/shared/TrustBar";
 import { useSignals, useSignalsRealtime, signalStore } from "../core/signalStore";
 import { trustToIntensity } from "../core/types";
 import { ArrowLeft, MapPin, Clock, Users, ShieldCheck, AlertTriangle, CheckCircle2, Camera } from "lucide-react-native";
+import { lightTap, mediumTap, successNotify } from "../core/haptics";
 
 const STATE_LABEL = (reports: number, trust: number) => {
   if (reports >= 20) return { label: "Verified", color: "#D8F3DC", textColor: "#2D6A4F" };
@@ -35,7 +36,7 @@ export default function IncidentDetailScreen() {
     return (
       <AppShell>
         <TopBar />
-        <TouchableOpacity onPress={() => navigation.navigate("FeedTab")}>
+        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("FeedTab"); }}>
           <Text style={styles.back}><ArrowLeft size={14} color="#6B7280" /> Back to feed</Text>
         </TouchableOpacity>
         <View style={styles.notFound}>
@@ -60,7 +61,7 @@ export default function IncidentDetailScreen() {
     <AppShell>
       <TopBar />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => navigation.navigate("FeedTab")}>
+        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("FeedTab"); }}>
           <Text style={styles.back}><ArrowLeft size={14} color="#6B7280" /> Back</Text>
         </TouchableOpacity>
 
@@ -90,7 +91,7 @@ export default function IncidentDetailScreen() {
             Confidence rises as more neighbors confirm. {signal.reports} of 20 needed for verified status.
           </Text>
           <TrustBar value={signal.trust} />
-          <TouchableOpacity style={styles.verifyBtn} onPress={verify} disabled={verifying}>
+          <TouchableOpacity style={styles.verifyBtn} onPress={() => { mediumTap(); verify(); }} disabled={verifying}>
             <Text style={styles.verifyBtnText}>
               {verifying ? "Confirming…" : "I can confirm this"}
             </Text>
@@ -126,7 +127,7 @@ export default function IncidentDetailScreen() {
         {/* Status buttons */}
         <View style={styles.statusRow}>
           {["Still active", "Resolved", "False alarm"].map((c) => (
-            <TouchableOpacity key={c} style={styles.statusBtn}>
+            <TouchableOpacity key={c} style={styles.statusBtn} onPress={() => { lightTap(); }}>
               <Text style={styles.statusBtnText}>{c}</Text>
             </TouchableOpacity>
           ))}

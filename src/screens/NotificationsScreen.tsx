@@ -12,6 +12,7 @@ import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
 import { supabase } from "../core/supabase";
 import { Bell, BellOff, CheckCheck, ShieldCheck, AlertTriangle, Siren } from "lucide-react-native";
+import { lightTap, softTap } from "../core/haptics";
 
 interface Notif {
   id: string;
@@ -85,6 +86,7 @@ export default function NotificationsScreen() {
       setItems((arr) => arr.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
       void supabase.from("notifications").update({ read: true }).eq("id", n.id);
     }
+    lightTap();
     const d = n.data ?? {};
     if (d.signal_id) { navigation.navigate("IncidentDetail", { id: d.signal_id }); return; }
     if (d.request_id || n.kind === "circle_request" || n.kind === "circle_accepted") { navigation.navigate("CircleTab"); return; }
@@ -104,7 +106,7 @@ export default function NotificationsScreen() {
           </Text>
         </View>
         {unread > 0 && (
-          <TouchableOpacity style={styles.markBtn} onPress={markAll}>
+          <TouchableOpacity style={styles.markBtn} onPress={() => { softTap(); markAll(); }}>
             <CheckCheck size={14} color="#1A1A2E" />
             <Text style={styles.markText}>Mark all read</Text>
           </TouchableOpacity>

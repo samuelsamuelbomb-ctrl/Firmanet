@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MapPin, Clock, Users } from "lucide-react-native";
 import type { SignalCluster } from "../../core/types";
+import { lightTap } from "../../core/haptics";
 
 interface ClusterCardProps {
   cluster: SignalCluster;
@@ -19,7 +20,7 @@ export function ClusterCard({ cluster }: ClusterCardProps) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => navigation.navigate("IncidentDetail", { id: cluster.primary.id })}
+      onPress={() => { lightTap(); navigation.navigate("IncidentDetail", { id: cluster.primary.id }); }}
       activeOpacity={0.7}
     >
       <View style={styles.header}>

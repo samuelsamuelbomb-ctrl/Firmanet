@@ -11,6 +11,7 @@ import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
 import { sponsors } from "../core/sponsors";
 import { Volume2, Vibrate, Radius, Moon, BellRing, Handshake } from "lucide-react-native";
+import { lightTap, selectionTick } from "../core/haptics";
 
 const INTENSITIES = [
   { id: "minimal",  label: "Minimal",  sub: "Only critical alerts",     color: "#2D6A4F" },
@@ -42,7 +43,7 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={opt.id}
                 style={[styles.intensityOption, intensity === opt.id && { borderColor: opt.color, borderWidth: 2 }]}
-                onPress={() => setIntensity(opt.id)}
+                onPress={() => { lightTap(); setIntensity(opt.id); }}
               >
                 <View style={[styles.intensityBadge, { backgroundColor: opt.color + "30" }]}>
                   <Text style={[styles.intensityBadgeText, { color: opt.color }]}>{opt.label}</Text>
@@ -66,7 +67,7 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity
               style={[styles.toggle, quietHours && styles.toggleOn]}
-              onPress={() => setQuietHours((v) => !v)}
+              onPress={() => { selectionTick(); setQuietHours((v) => !v); }}
             >
               <View style={[styles.toggleKnob, quietHours && styles.toggleKnobOn]} />
             </TouchableOpacity>
@@ -120,7 +121,7 @@ function SliderRow({
       </View>
       <View style={styles.sliderTouchArea}>
         {[min, Math.round((max - min) / 4 + min), Math.round((max - min) / 2 + min), Math.round(3 * (max - min) / 4 + min), max].map((v) => (
-          <TouchableOpacity key={v} style={styles.sliderStop} onPress={() => onChange(v)}>
+          <TouchableOpacity key={v} style={styles.sliderStop} onPress={() => { selectionTick(); onChange(v); }}>
             <View style={[styles.sliderDot, value >= v && styles.sliderDotActive]} />
           </TouchableOpacity>
         ))}

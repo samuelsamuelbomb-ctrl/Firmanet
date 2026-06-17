@@ -1,11 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/swish/AppShell";
 import { TopBar } from "@/components/swish/TopBar";
 import { Volume2, Vibrate, Moon, Radius, BellRing } from "lucide-react";
 import { Handshake } from "lucide-react";
 import { SponsorCard } from "@/components/swish/SponsorCard";
 import { sponsors } from "@/lib/sponsors";
+
+const SETTINGS_KEY = "firmanet-settings";
+
+type IntensityId = "minimal" | "balanced" | "full";
+
+interface Settings {
+  intensity: IntensityId;
+  vibration: number;
+  radius: number;
+  quietHours: boolean;
+}
+
+function loadSettings(): Settings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return JSON.parse(raw) as Settings;
+  } catch { /* ignore */ }
+  return { intensity: "balanced", vibration: 70, radius: 3, quietHours: true };
+}
+
+function saveSettings(s: Settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch { /* ignore */ }
+}
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -46,6 +71,23 @@ function SettingsPage() {
   const [vibration, setVibration] = useState(70);
   const [radius, setRadius] = useState(3);
   const [quietHours, setQuietHours] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    const s = loadSettings();
+    setIntensity(s.intensity);
+    setVibration(s.vibration);
+    setRadius(s.radius);
+    setQuietHours(s.quietHours);
+    setLoaded(true);
+  }, []);
+
+  // Persist whenever a value changes and we've loaded from storage
+  useEffect(() => {
+    if (!loaded) return;
+    saveSettings({ intensity, vibration, radius, quietHours });
+  }, [intensity, vibration, radius, quietHours, loaded]);
 
   return (
     <AppShell>

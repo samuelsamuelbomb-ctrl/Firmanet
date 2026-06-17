@@ -22,6 +22,7 @@ import {
   ShieldAlert, Flame, Droplets, Car, UserSearch, HelpCircle, Loader2,
 } from "lucide-react-native";
 import type { Signal, SignalCluster, SignalCategory, SignalType } from "../core/types";
+import { lightTap, mediumTap, successNotify } from "../core/haptics";
 
 const TABS = ["For You", "Near You", "Verified", "Alerts"] as const;
 type Tab = (typeof TABS)[number];
@@ -69,7 +70,7 @@ export default function FeedScreen() {
             <TouchableOpacity
               key={t}
               style={[styles.tab, tab === t && styles.tabActive]}
-              onPress={() => setTab(t)}
+              onPress={() => { lightTap(); setTab(t); }}
             >
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t}</Text>
             </TouchableOpacity>
@@ -93,7 +94,7 @@ export default function FeedScreen() {
       {/* Create report FAB */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => setOpen(true)}
+        onPress={() => { mediumTap(); setOpen(true); }}
         accessibilityLabel="Create report"
       >
         <Plus size={24} color="#FFFFFF" strokeWidth={2.4} />
@@ -189,7 +190,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
                 {processing ? "Processing report" : ["Type", "Details", "Media", "Location", "Review"][step]}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={createStyles.iconBtn}>
+            <TouchableOpacity onPress={() => { lightTap(); onClose(); }} style={createStyles.iconBtn}>
               <X size={18} color="#1A1A2E" />
             </TouchableOpacity>
           </View>
@@ -214,7 +215,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
                 <TouchableOpacity
                   key={c.key}
                   style={[createStyles.categoryCard, cat?.key === c.key && createStyles.categoryCardActive]}
-                  onPress={() => { setCat(c); next(); }}
+                  onPress={() => { lightTap(); setCat(c); next(); }}
                 >
                   <View style={[createStyles.categoryIconWrap, { backgroundColor: c.color + "20" }]}>
                     <c.Icon size={20} color={c.color} />
@@ -246,7 +247,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
           ) : step === 2 ? (
             /* Step 2: Media */
             <View style={createStyles.stepContent}>
-              <TouchableOpacity style={createStyles.mediaBtn} onPress={() => setMedia((m) => m + 1)}>
+              <TouchableOpacity style={createStyles.mediaBtn} onPress={() => { lightTap(); setMedia((m) => m + 1); }}>
                 <Camera size={20} color="#6B7280" />
                 <Text style={createStyles.mediaBtnText}>Add photo or video {media > 0 ? `(${media})` : ""}</Text>
               </TouchableOpacity>
@@ -296,7 +297,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
                 <ChevronRight size={18} color="#FFFFFF" />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={createStyles.actionBtn} onPress={submit}>
+              <TouchableOpacity style={createStyles.actionBtn} onPress={() => { mediumTap(); successNotify(); submit(); }}>
                 <Text style={createStyles.actionBtnText}>Submit report</Text>
               </TouchableOpacity>
             )

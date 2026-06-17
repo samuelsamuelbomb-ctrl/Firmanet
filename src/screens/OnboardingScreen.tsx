@@ -12,6 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Shield, Users, Radar, Sparkles, Siren, ChevronRight } from "lucide-react-native";
 import { sponsors } from "../core/sponsors";
 import * as SecureStore from "expo-secure-store";
+import { lightTap } from "../core/haptics";
 
 const SLIDES = ["mission", "purpose", "intelligence", "alerts", "sponsors"] as const;
 type Stage = (typeof SLIDES)[number];
@@ -41,7 +42,7 @@ export default function OnboardingScreen() {
               <View key={s} style={[styles.dot, i <= idx && styles.dotActive]} />
             ))}
           </View>
-          <TouchableOpacity onPress={() => navigation.replace("Login")}>
+          <TouchableOpacity onPress={() => { lightTap(); navigation.replace("Login"); }}>
             <Text style={styles.skip}>Skip</Text>
           </TouchableOpacity>
         </View>
@@ -54,7 +55,7 @@ export default function OnboardingScreen() {
           {stage === "sponsors" && <Sponsors />}
         </View>
 
-        <TouchableOpacity style={styles.continueBtn} onPress={next} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.continueBtn} onPress={() => { lightTap(); next(); }} activeOpacity={0.8}>
           <Text style={styles.continueText}>
             {idx === SLIDES.length - 1 ? "Get started" : "Continue"}
           </Text>

@@ -7,6 +7,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ChevronRight } from "lucide-react-native";
+import { lightTap } from "../../core/haptics";
 
 interface SectionHeaderProps {
   title: string;
@@ -23,7 +24,7 @@ export function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
       {action && onAction && (
         <TouchableOpacity
           style={styles.action}
-          onPress={() => navigation.navigate(onAction)}
+          onPress={() => { lightTap(); navigation.navigate(onAction); }}
           activeOpacity={0.7}
         >
           <Text style={styles.actionText}>{action}</Text>

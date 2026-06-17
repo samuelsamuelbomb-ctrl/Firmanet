@@ -9,6 +9,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Newspaper, Map, Users, Settings } from "lucide-react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { lightTap } from "../core/haptics";
 
 const TABS = [
   { key: "home",     label: "Home",     icon: Home,     route: "HomeTab" },
@@ -37,6 +38,7 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               canPreventDefault: true,
             });
             if (!isFocused && !event.defaultPrevented) {
+              lightTap();
               navigation.navigate(route.name);
             }
           };

@@ -15,6 +15,7 @@ import { supabase } from "../core/supabase";
 import { useAuth } from "../context/AuthContext";
 import { deleteFcmToken, removeTokenFromSupabase } from "../services/notifications";
 import { LogOut, MapPin, Shield, Save, BellRing } from "lucide-react-native";
+import { lightTap, mediumTap, successNotify } from "../core/haptics";
 
 interface ProfileRow {
   id: string;
@@ -109,7 +110,7 @@ export default function ProfileScreen() {
           <Row label="Email">
             <Text style={styles.emailText}>{email}</Text>
           </Row>
-          <TouchableOpacity style={styles.saveBtn} onPress={save} disabled={saving}>
+          <TouchableOpacity style={styles.saveBtn} onPress={() => { mediumTap(); save(); }} disabled={saving}>
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
@@ -133,7 +134,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Sign out */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+          <TouchableOpacity style={styles.signOutBtn} onPress={() => { lightTap(); handleSignOut(); }}>
           <LogOut size={16} color="#1A1A2E" />
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>

@@ -17,6 +17,7 @@ import { useSignals, useSignalsRealtime } from "../core/signalStore";
 import { getMapboxModule, getMapboxToken, MAP_DEFAULT_CENTER, MAP_DEFAULT_ZOOM } from "../core/mapbox";
 import { TrustBar } from "../components/shared/TrustBar";
 import type { Signal, SignalCategory } from "../core/types";
+import { lightTap, mediumTap } from "../core/haptics";
 
 const LAYERS = [
   { id: "crime" as SignalCategory, label: "Crime",    dot: "#E63946" },
@@ -121,7 +122,7 @@ export default function MapScreen() {
               <View style={styles.sheetBadge}>
                 <Text style={styles.sheetBadgeText}>{selected.category} · {selected.state.replace("_", " ")}</Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedId(null)}>
+              <TouchableOpacity onPress={() => { lightTap(); setSelectedId(null); }}>
                 <Text style={styles.sheetClose}>Close</Text>
               </TouchableOpacity>
             </View>
@@ -134,6 +135,7 @@ export default function MapScreen() {
               style={styles.sheetBtn}
               onPress={() => {
                 setSelectedId(null);
+                lightTap();
                 navigation.navigate("MainStack", { screen: "IncidentDetail", params: { id: selected.id } });
               }}
             >
@@ -172,6 +174,7 @@ export default function MapScreen() {
             <TouchableOpacity
               style={[styles.marker, { backgroundColor: CATEGORY_COLORS[s.category] ?? "#6B7280" }]}
               onPress={() => {
+                mediumTap();
                 setSelectedId(s.id);
                 cameraRef.current?.flyTo([s.lng, s.lat], 600);
               }}
@@ -196,7 +199,7 @@ export default function MapScreen() {
         <View style={styles.filterRow}>
           <TouchableOpacity
             style={[styles.filterPill, verifiedOnly && styles.filterPillActive]}
-            onPress={() => setVerifiedOnly((v) => !v)}
+            onPress={() => { lightTap(); setVerifiedOnly((v) => !v); }}
           >
             <ShieldCheck size={14} color={verifiedOnly ? "#2D6A4F" : "#6B7280"} />
             <Text style={[styles.filterText, verifiedOnly && styles.filterTextActive]}>Verified</Text>
@@ -207,7 +210,7 @@ export default function MapScreen() {
               <TouchableOpacity
                 key={l.id}
                 style={[styles.filterPill, on && styles.filterPillLayer]}
-                onPress={() => setActive((a) => (on ? a.filter((x) => x !== l.id) : [...a, l.id]))}
+                onPress={() => { lightTap(); setActive((a) => (on ? a.filter((x) => x !== l.id) : [...a, l.id])); }}
               >
                 <View style={[styles.filterDot, { backgroundColor: l.dot }]} />
                 <Text style={styles.filterText}>{l.label}</Text>
@@ -217,7 +220,7 @@ export default function MapScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.locateBtn} onPress={recenter}>
+      <TouchableOpacity style={styles.locateBtn} onPress={() => { mediumTap(); recenter(); }}>
         <Locate size={20} color="#1A1A2E" />
       </TouchableOpacity>
 
@@ -227,7 +230,7 @@ export default function MapScreen() {
             <View style={styles.sheetBadge}>
               <Text style={styles.sheetBadgeText}>{selected.category} · {selected.state.replace("_", " ")}</Text>
             </View>
-            <TouchableOpacity onPress={() => setSelectedId(null)}>
+            <TouchableOpacity onPress={() => { lightTap(); setSelectedId(null); }}>
               <Text style={styles.sheetClose}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -240,6 +243,7 @@ export default function MapScreen() {
             style={styles.sheetBtn}
             onPress={() => {
               setSelectedId(null);
+              lightTap();
               navigation.navigate("MainStack", { screen: "IncidentDetail", params: { id: selected.id } });
             }}
           >

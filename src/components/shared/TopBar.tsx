@@ -12,6 +12,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useState, useEffect } from "react";
 import { MapPin, Bell, User } from "lucide-react-native";
+import { lightTap } from "../../core/haptics";
 
 interface TopBarProps {
   hideBell?: boolean;
@@ -72,7 +73,7 @@ export function TopBar({
         {!hideBell && (
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => navigation.navigate("Notifications")}
+            onPress={() => { lightTap(); navigation.navigate("Notifications"); }}
             accessibilityLabel="Notifications"
           >
             <Bell size={18} color="#1A1A2E" />
@@ -82,7 +83,7 @@ export function TopBar({
         {!hideProfile && (
           <TouchableOpacity
             style={styles.profileButton}
-            onPress={() => navigation.navigate("Profile")}
+            onPress={() => { lightTap(); navigation.navigate("Profile"); }}
             accessibilityLabel="Profile"
           >
             <User size={18} color="#FFFFFF" />

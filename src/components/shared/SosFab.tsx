@@ -10,6 +10,7 @@ import { useRef } from "react";
 import { TouchableOpacity, StyleSheet, View, PanResponder, Animated, Dimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Siren } from "lucide-react-native";
+import { heavyTap } from "../../core/haptics";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const BTN_SIZE = 64;
@@ -83,6 +84,7 @@ export function SosFab() {
 
   const handlePress = () => {
     if (!isDragging.current) {
+      heavyTap();
       navigation.navigate("SOS");
     }
     isDragging.current = false;

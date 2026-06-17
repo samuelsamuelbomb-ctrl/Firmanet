@@ -11,6 +11,8 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, TextInput } fro
 import { useNavigation } from "@react-navigation/native";
 import { Siren, MapPin, Users, Radio, X, Check, Lock } from "lucide-react-native";
 import { supabase } from "../core/supabase";
+import { SOS_CIRCLE_SIZE } from "../core/constants";
+import { lightTap, mediumTap, heavyTap, successNotify, errorNotify } from "../core/haptics";
 
 type Stage = "ready" | "holding" | "armed" | "active";
 
@@ -18,11 +20,24 @@ export default function SOSScreen() {
   const navigation = useNavigation<any>();
   const [stage, setStage] = useState<Stage>("ready");
   const [hold, setHold] = useState(0);
-  const [acks, setAcks] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [deact, setDeact] = useState(false);
+  const [circleCount, setCircleCount] = useState<number | null>(null);
+  const [realAcks, setRealAcks] = useState<number>(0);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [userLocationName, setUserLocationName] = useState("Current Location");
+
+  // Fetch real circle member count
+  useEffect(() => {
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data } = await supabase
+        .from("circle_members")
+        .select("id", { count: "exact", head: false });
+      setCircleCount(data?.length ?? 0);
+    })();
+  }, []);
 
   // Get user's real location on mount
   useEffect(() => {
@@ -61,10 +76,26 @@ export default function SOSScreen() {
     return () => clearTimeout(t);
   }, [stage, hold]);
 
-  // Activate SOS: create session + start acknowledgment counter
+  // Real acknowledgment subscription
+  useEffect(() => {
+    if (stage !== "active") return;
+    const ch = supabase
+      .channel("sos-acks-stream")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "sos_sessions", filter: `id=eq.${sessionId ?? ""}` },
+        (payload) => {
+          const count = (payload.new as { acknowledged_count?: number }).acknowledged_count ?? 0;
+          setRealAcks(count);
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [stage, sessionId]);
+
+  // Activate SOS: create session
   useEffect(() => {
     if (stage === "active") {
-      setAcks(0);
       void (async () => {
         const { data: auth } = await supabase.auth.getUser();
         if (!auth.user) return;
@@ -75,30 +106,29 @@ export default function SOSScreen() {
           .single();
         if (data) setSessionId(data.id as string);
       })();
-      const t = setInterval(
-        () => setAcks((n) => (n >= 12 ? n : n + 1 + Math.floor(Math.random() * 2))),
-        700,
-      );
-      return () => clearInterval(t);
     }
   }, [stage]);
 
   // Sync acknowledged count to server
   useEffect(() => {
     if (!sessionId) return;
-    void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(acks, 12) }).eq("id", sessionId);
-  }, [acks, sessionId]);
+    void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(realAcks, SOS_CIRCLE_SIZE) }).eq("id", sessionId);
+  }, [realAcks, sessionId]);
 
-  const startHold = () => { setHold(0); setStage("holding"); };
-  const cancel = () => { setHold(0); setStage("ready"); };
-  const endEmergency = () => { setDeact(true); };
+  const startHold = () => { setHold(0); setStage("holding"); heavyTap(); };
+  const cancel = () => { setHold(0); setStage("ready"); lightTap(); };
+  const endEmergency = () => { setDeact(true); lightTap(); };
 
   const confirmDeactivate = () => {
     if (sessionId) {
       void supabase.from("sos_sessions").update({ status: "resolved", ended_at: new Date().toISOString() }).eq("id", sessionId);
     }
+    heavyTap();
     navigation.goBack();
   };
+
+  const totalAcks = Math.min(realAcks, SOS_CIRCLE_SIZE);
+  const circleSize = circleCount ?? SOS_CIRCLE_SIZE;
 
   // ─── ACTIVE STATE ───
   if (stage === "active") {
@@ -118,15 +148,15 @@ export default function SOSScreen() {
             </View>
             <Text style={styles.activeTitle}>Help is on the way</Text>
             <Text style={styles.activeSub}>
-              Location sharing is ON · {Math.min(acks, 12)}/12 circle contacts confirmed.
+              {userCoords ? "Location shared" : "Location acquired"} · {totalAcks}/{circleSize} circle contacts confirmed.
             </Text>
             <View style={styles.activeRows}>
-              <Row icon={<MapPin size={16} color="#FFFFFF" />} text="Live location: streaming" />
+              <Row icon={<MapPin size={16} color="#FFFFFF" />} text={userCoords ? `Location: ${userLocationName}` : "Acquiring location…"} />
               <Row
-                icon={acks >= 12 ? <Check size={16} color="#FFFFFF" /> : <Users size={16} color="#FFFFFF" />}
-                text={`Circle notified · ${Math.min(acks, 12)} acknowledged`}
+                icon={totalAcks >= circleSize ? <Check size={16} color="#FFFFFF" /> : <Users size={16} color="#FFFFFF" />}
+                text={`Circle notified · ${totalAcks} acknowledged`}
               />
-              <Row icon={<Radio size={16} color="#FFFFFF" />} text="Nearby Firmanet users · 47 alerted" />
+              <Row icon={<Radio size={16} color="#FFFFFF" />} text="Nearby Firmanet users will be alerted" />
             </View>
           </View>
 
@@ -144,7 +174,7 @@ export default function SOSScreen() {
     <View style={styles.container}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+          <TouchableOpacity onPress={() => { lightTap(); navigation.goBack(); }} style={styles.closeBtn}>
             <X size={20} color="#1A1A2E" />
           </TouchableOpacity>
           <Text style={styles.topLabel}>Emergency</Text>
@@ -180,8 +210,8 @@ export default function SOSScreen() {
         </View>
 
         <View style={styles.infoCard}>
-          <Row icon={<MapPin size={16} color="#2D6A4F" />} text="Live location: ON" />
-          <Row icon={<Users size={16} color="#2D6A4F" />} text="12 trusted contacts in your circle" />
+          <Row icon={<MapPin size={16} color="#2D6A4F" />} text={userCoords ? `Location: ${userLocationName}` : "Acquiring location…"} />
+          <Row icon={<Users size={16} color="#2D6A4F" />} text={`${circleCount !== null ? circleCount : circleSize} trusted contact${circleCount !== 1 ? "s" : ""} in your circle`} />
           <Row icon={<Radio size={16} color="#2D6A4F" />} text="Nearby Firmanet users will be notified" />
         </View>
 
@@ -190,7 +220,7 @@ export default function SOSScreen() {
             <TouchableOpacity style={styles.cancelBtn} onPress={cancel}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sendBtn} onPress={() => setStage("active")}>
+            <TouchableOpacity style={styles.sendBtn} onPress={() => { heavyTap(); successNotify(); setStage("active"); }}>
               <Text style={styles.sendText}>Send alert</Text>
             </TouchableOpacity>
           </View>
@@ -268,12 +298,12 @@ function DeactivateModal({ onCancel, onConfirm }: { onCancel: () => void; onConf
         )}
 
         <View style={modalStyles.btnRow}>
-          <TouchableOpacity style={modalStyles.stayBtn} onPress={onCancel}>
+          <TouchableOpacity style={modalStyles.stayBtn} onPress={() => { lightTap(); onCancel(); }}>
             <Text style={modalStyles.stayText}>Stay active</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[modalStyles.confirmBtn, (!ready || !match) && modalStyles.confirmDisabled]}
-            onPress={onConfirm}
+            onPress={() => { heavyTap(); onConfirm(); }}
             disabled={!ready || !match}
           >
             <Text style={[modalStyles.confirmText, (!ready || !match) && modalStyles.confirmTextDisabled]}>

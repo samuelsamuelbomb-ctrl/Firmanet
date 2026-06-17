@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Siren, MapPin, Users, Radio, X, Check, Lock, Phone, Share2 } from "lucide-react";
+import { Siren, MapPin, Users, Radio, X, Check, Lock } from "lucide-react";
 import { play, stopSos } from "@/lib/swish-sound";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserLocation } from "@/hooks/useUserLocation";
+import { SOS_CIRCLE_SIZE } from "@/core/constants";
 
 export const Route = createFileRoute("/sos")({
   head: () => ({
@@ -16,42 +18,43 @@ export const Route = createFileRoute("/sos")({
 
 function SosPage() {
   const navigate = useNavigate();
+  const { location: gpsLocation, loading: locationLoading } = useUserLocation();
   const [stage, setStage] = useState<"ready" | "holding" | "armed" | "active">("ready");
   const [hold, setHold] = useState(0);
   const [acks, setAcks] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [deact, setDeact] = useState(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [userLocationName, setUserLocationName] = useState("Current Location");
+  const [circleCount, setCircleCount] = useState<number | null>(null);
+  const [realAcks, setRealAcks] = useState<number>(0);
 
-  // Get user's real location on mount
+  // Fetch real circle member count
   useEffect(() => {
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setUserCoords({ lat, lng });
-          // Attempt reverse geocoding
-          const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN ?? process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
-          if (token) {
-            fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
-            )
-              .then((r) => r.json())
-              .then((data) => {
-                if (data?.features?.[0]?.place_name) {
-                  setUserLocationName(data.features[0].place_name);
-                }
-              })
-              .catch(() => {});
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10_000 },
-      );
-    }
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data } = await supabase
+        .from("circle_members")
+        .select("id", { count: "exact", head: false });
+      setCircleCount(data?.length ?? 0);
+    })();
   }, []);
+
+  // Real acknowledgment subscription
+  useEffect(() => {
+    if (stage !== "active") return;
+    const ch = supabase
+      .channel("sos-acks-stream")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "sos_sessions", filter: `id=eq.${sessionId ?? ""}` },
+        (payload) => {
+          const count = (payload.new as { acknowledged_count?: number }).acknowledged_count ?? 0;
+          setRealAcks(count);
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [stage, sessionId]);
 
   useEffect(() => {
     if (stage !== "holding") return;
@@ -77,28 +80,23 @@ function SosPage() {
           .insert({
             user_id: auth.user.id,
             status: "active",
-            location: userLocationName,
+            location: gpsLocation?.locationName ?? "Current Location",
           })
           .select()
           .single();
         if (data) setSessionId(data.id as string);
       })();
-      const t = setInterval(
-        () => setAcks((n) => (n >= 12 ? n : n + 1 + Math.floor(Math.random() * 2))),
-        700,
-      );
-      return () => clearInterval(t);
     }
     return () => {};
   }, [stage]);
 
   useEffect(() => () => stopSos(), []);
 
-  // Sync acknowledged count to the server while active
+  // Sync acknowledged count to the server while active (from real acks + inline)
   useEffect(() => {
     if (!sessionId) return;
-    void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(acks, 12) }).eq("id", sessionId);
-  }, [acks, sessionId]);
+    void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(acks + realAcks, SOS_CIRCLE_SIZE) }).eq("id", sessionId);
+  }, [acks, realAcks, sessionId]);
 
   const startHold = () => {
     setHold(0);
@@ -124,6 +122,10 @@ function SosPage() {
     navigate({ to: "/" });
   };
 
+  const totalAcks = Math.min(acks + realAcks, SOS_CIRCLE_SIZE);
+  const locationReady = gpsLocation && !locationLoading;
+  const circleSize = circleCount ?? SOS_CIRCLE_SIZE;
+
   if (stage === "active") {
     return (
       <div className="min-h-screen bg-danger text-danger-foreground">
@@ -142,16 +144,16 @@ function SosPage() {
             </div>
             <h1 className="mt-6 font-display text-3xl font-bold">Help is on the way</h1>
             <p className="mt-2 max-w-xs text-sm opacity-90">
-              Location sharing is ON · {Math.min(acks, 12)}/12 circle contacts confirmed.
+              {locationReady ? "Location shared" : "Location acquired"} · {totalAcks}/{circleSize} circle contacts confirmed.
             </p>
 
             <div className="mt-6 w-full space-y-2 text-left text-sm">
-              <Row icon={<MapPin className="h-4 w-4" />} text="Live location: streaming" />
+              <Row icon={<MapPin className="h-4 w-4" />} text={locationReady ? `Location: ${gpsLocation.locationName}` : "Acquiring location…"} />
               <Row
-                icon={acks >= 12 ? <Check className="h-4 w-4" /> : <Users className="h-4 w-4" />}
-                text={`Circle notified · ${Math.min(acks, 12)} acknowledged`}
+                icon={totalAcks >= circleSize ? <Check className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                text={`Circle notified · ${totalAcks} acknowledged`}
               />
-              <Row icon={<Radio className="h-4 w-4" />} text="Nearby Firmanet users · 47 alerted" />
+              <Row icon={<Radio className="h-4 w-4" />} text="Nearby Firmanet users will be alerted" />
             </div>
           </div>
 
@@ -227,8 +229,8 @@ function SosPage() {
         </div>
 
         <div className="space-y-2 rounded-3xl bg-card p-4 shadow-soft">
-          <Row icon={<MapPin className="h-4 w-4 text-mint-foreground" />} text="Live location: ON" />
-          <Row icon={<Users className="h-4 w-4 text-mint-foreground" />} text="12 trusted contacts in your circle" />
+          <Row icon={<MapPin className="h-4 w-4 text-mint-foreground" />} text={locationReady ? `Location: ${gpsLocation.locationName}` : "Acquiring location…"} />
+          <Row icon={<Users className="h-4 w-4 text-mint-foreground" />} text={`${circleCount !== null ? circleCount : circleSize} trusted contact${circleCount !== 1 ? "s" : ""} in your circle`} />
           <Row icon={<Radio className="h-4 w-4 text-mint-foreground" />} text="Nearby Firmanet users will be notified" />
         </div>
 

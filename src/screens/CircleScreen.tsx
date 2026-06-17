@@ -15,6 +15,7 @@ import { TopBar } from "../components/shared/TopBar";
 import { supabase } from "../core/supabase";
 import { Plus, MapPin, X, Trash2, Search, Check, UserPlus, Inbox } from "lucide-react-native";
 import type { Intensity } from "../core/types";
+import { lightTap, mediumTap, successNotify } from "../core/haptics";
 
 type Member = {
   id: string;
@@ -107,7 +108,7 @@ export default function CircleScreen() {
           <Text style={styles.title}>Your Circle</Text>
           <Text style={styles.sub}>{members.length} trusted {members.length === 1 ? "contact" : "contacts"}</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setOpen(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => { mediumTap(); setOpen(true); }}>
           <Plus size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -131,10 +132,10 @@ export default function CircleScreen() {
                     <Text style={styles.requestName}>{r.from_name ?? r.from_username}</Text>
                     <Text style={styles.requestUser}>@{r.from_username}</Text>
                   </View>
-                  <TouchableOpacity style={styles.declineBtn} onPress={() => decline(r)}>
+                  <TouchableOpacity style={styles.declineBtn} onPress={() => { lightTap(); decline(r); }}>
                     <Text style={styles.declineText}>Decline</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(r)}>
+                  <TouchableOpacity style={styles.acceptBtn} onPress={() => { mediumTap(); successNotify(); accept(r); }}>
                     <Text style={styles.acceptText}>Accept</Text>
                   </TouchableOpacity>
                 </View>
@@ -167,7 +168,7 @@ export default function CircleScreen() {
               <View style={[styles.statusBadge, { backgroundColor: t.dot + "20" }]}>
                 <Text style={[styles.statusText, { color: t.dot }]}>{t.label}</Text>
               </View>
-              <TouchableOpacity onPress={() => remove(m.id)} style={styles.removeBtn}>
+              <TouchableOpacity onPress={() => { lightTap(); remove(m.id); }} style={styles.removeBtn}>
                 <Trash2 size={14} color="#6B7280" />
               </TouchableOpacity>
             </View>
@@ -223,7 +224,7 @@ function AddMemberModal({ me, onClose, onAdded }: { me: string | null; onClose: 
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add to your Circle</Text>
-            <TouchableOpacity onPress={onClose}><X size={20} color="#1A1A2E" /></TouchableOpacity>
+            <TouchableOpacity onPress={() => { lightTap(); onClose(); }}><X size={20} color="#1A1A2E" /></TouchableOpacity>
           </View>
           <View style={styles.searchBar}>
             <Search size={16} color="#6B7280" />
