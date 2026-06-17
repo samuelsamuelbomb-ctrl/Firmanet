@@ -126,7 +126,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [media, setMedia] = useState(0);
-  const [location, setLocation] = useState("Current Location");
+  const [location, setLocation] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -137,6 +137,8 @@ function CreateModal({ onClose }: { onClose: () => void }) {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setCoords({ lat, lng });
+          // Show coordinates immediately as fallback
+          setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
           // Attempt reverse geocoding for a meaningful location name
           const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? process.env.MAPBOX_PUBLIC_TOKEN ?? "";
           if (token) {
@@ -167,7 +169,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
         category: cat.key,
         title: title.trim() || cat.label,
         description: desc,
-        location,
+        location: location ?? undefined,
         lat: coords?.lat,
         lng: coords?.lng,
       });
@@ -243,7 +245,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
                 <MapPin className="h-3.5 w-3.5" />
                 {coords ? "GPS locked" : "Auto"}
               </span>
-              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Address or area" className="w-full rounded-full bg-muted px-3 py-1.5 text-xs outline-none placeholder:text-muted-foreground" />
+              <input value={location ?? ""} onChange={(e) => setLocation(e.target.value || null)} placeholder="Address or area" className="w-full rounded-full bg-muted px-3 py-1.5 text-xs outline-none placeholder:text-muted-foreground" />
             </div>
             <p className="mt-3 text-xs text-muted-foreground">You can adjust manually if GPS isn't precise.</p>
           </div>
@@ -251,7 +253,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
           <div className="mt-4 space-y-2">
             <Review label="Type" value={cat?.label ?? "—"} />
             <Review label="Title" value={title || "(none)"} />
-            <Review label="Location" value={location} />
+            <Review label="Location" value={location ?? "Acquiring location…"} />
             <Review label="Media" value={`${media} attachment${media === 1 ? "" : "s"}`} />
             <p className="mt-3 rounded-2xl bg-mint/40 px-3 py-2 text-[11px] text-mint-foreground">
               Initial confidence: low. Will rise as neighbors confirm.

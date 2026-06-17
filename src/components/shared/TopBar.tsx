@@ -10,19 +10,53 @@
 
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useState, useEffect } from "react";
 import { MapPin, Bell, User } from "lucide-react-native";
 
 interface TopBarProps {
-  location?: string;
   hideBell?: boolean;
   hideProfile?: boolean;
 }
 
 export function TopBar({
-  location = "Ikeja, Lagos",
   hideBell = false,
   hideProfile = false,
 }: TopBarProps) {
+  const [displayLocation, setDisplayLocation] = useState("Getting location…");
+
+  // Get real location on mount
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          // Try reverse geocoding via Mapbox if token available
+          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+          if (token) {
+            fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
+            )
+              .then((r) => r.json())
+              .then((data) => {
+                if (data?.features?.[0]?.place_name) {
+                  setDisplayLocation(data.features[0].place_name);
+                } else {
+                  setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+                }
+              })
+              .catch(() => setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`));
+          } else {
+            setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        },
+        () => setDisplayLocation("Current Location"),
+        { enableHighAccuracy: true, timeout: 10_000 },
+      );
+    } else {
+      setDisplayLocation("Current Location");
+    }
+  }, []);
   const navigation = useNavigation<any>();
 
   return (
@@ -31,7 +65,7 @@ export function TopBar({
         <Logo size={28} />
         <TouchableOpacity style={styles.locationPill} activeOpacity={0.7}>
           <MapPin size={14} color="#2D6A4F" strokeWidth={2.5} />
-          <Text style={styles.locationText}>{location}</Text>
+          <Text style={styles.locationText}>{displayLocation}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.right}>

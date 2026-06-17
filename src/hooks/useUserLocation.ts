@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 export interface UserLocation {
   latitude: number;
   longitude: number;
-  /** Human-readable location name, e.g. "Ikeja, Lagos" or "Current Location" */
+  /** Human-readable location name, e.g. "Surulere, Lagos" or "Current Location" */
   locationName: string;
 }
 
@@ -16,7 +16,8 @@ interface UseUserLocationReturn {
 
 /**
  * Shared hook that tracks the user's real GPS location.
- * Also attempts reverse geocoding via Mapbox if a token is available.
+ * Falls back to IP-based geolocation if GPS is unavailable or denied.
+ * Attempts reverse geocoding via Mapbox if a token is available.
  */
 export function useUserLocation(): UseUserLocationReturn {
   const [location, setLocation] = useState<UserLocation | null>(null);
@@ -27,35 +28,65 @@ export function useUserLocation(): UseUserLocationReturn {
 
   // Load Mapbox token once
   useEffect(() => {
-    const t = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? process.env.MAPBOX_PUBLIC_TOKEN ?? "";
+    const t =
+      process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
+      process.env.MAPBOX_PUBLIC_TOKEN ??
+      "";
     tokenRef.current = t || null;
   }, []);
 
+  // Reverse geocode via Mapbox
   const resolveLocationName = useCallback(
     async (lat: number, lng: number): Promise<string> => {
       const token = tokenRef.current;
-      if (!token) return "Current Location";
+      if (!token) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       try {
         const res = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood,address&limit=1`,
         );
-        if (!res.ok) return "Current Location";
+        if (!res.ok) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         const data = await res.json();
         if (data?.features?.[0]?.place_name) {
           return data.features[0].place_name;
         }
-        return "Current Location";
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       } catch {
-        return "Current Location";
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       }
     },
     [],
   );
 
+  // IP-based geolocation fallback
+  const tryIpFallback = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch("https://ipinfo.io/json");
+      if (!res.ok) return false;
+      const data = await res.json();
+      const [lat, lng] = (data.loc as string)?.split(",") ?? [];
+      if (lat && lng) {
+        const name = data.city
+          ? `${data.city}, ${data.region || data.country}`
+          : `${lat.trim()}, ${lng.trim()}`;
+        setLocation({
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lng),
+          locationName: name,
+        });
+        setError(null);
+        return true;
+      }
+    } catch {
+      // IP fallback failed silently
+    }
+    return false;
+  }, []);
+
+  // Manual refresh
   const refresh = useCallback(() => {
     if (!("geolocation" in navigator)) {
       setError("This device has no GPS / geolocation API.");
-      setLoading(false);
+      void tryIpFallback().then(() => setLoading(false));
       return;
     }
     setLoading(true);
@@ -68,27 +99,29 @@ export function useUserLocation(): UseUserLocationReturn {
         setError(null);
         setLoading(false);
       },
-      (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission denied. Enable it in your browser settings."
-            : err.message || "Couldn't get location.",
-        );
+      async (err) => {
+        const ipOk = await tryIpFallback();
+        if (!ipOk) {
+          setError(
+            err.code === err.PERMISSION_DENIED
+              ? "Location permission denied. Enable it in your browser settings."
+              : err.message || "Couldn't get location.",
+          );
+        }
         setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
     );
-  }, [resolveLocationName]);
+  }, [resolveLocationName, tryIpFallback]);
 
   // Start watching on mount
   useEffect(() => {
     if (!("geolocation" in navigator)) {
-      setError("This device has no GPS / geolocation API.");
-      setLoading(false);
+      void tryIpFallback().then(() => setLoading(false));
       return;
     }
 
-    // Immediate one-shot to get coords fast
+    // Immediate one-shot
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const lat = pos.coords.latitude;
@@ -98,18 +131,21 @@ export function useUserLocation(): UseUserLocationReturn {
         setError(null);
         setLoading(false);
       },
-      (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission denied."
-            : err.message || "Couldn't get location.",
-        );
+      async (err) => {
+        const ipOk = await tryIpFallback();
+        if (!ipOk) {
+          setError(
+            err.code === err.PERMISSION_DENIED
+              ? "Location permission denied."
+              : err.message || "Couldn't get location.",
+          );
+        }
         setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
     );
 
-    // Continuous watch for position updates
+    // Continuous watch
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const lat = pos.coords.latitude;
@@ -119,12 +155,8 @@ export function useUserLocation(): UseUserLocationReturn {
         setError(null);
         setLoading(false);
       },
-      (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission denied."
-            : err.message || "Couldn't get location.",
-        );
+      () => {
+        // Watch errors are expected (timeout etc.), keep last known coords
       },
       { enableHighAccuracy: true, maximumAge: 5_000, timeout: 15_000 },
     );
@@ -135,7 +167,7 @@ export function useUserLocation(): UseUserLocationReturn {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [resolveLocationName]);
+  }, [resolveLocationName, tryIpFallback]);
 
   return { location, error, loading, refresh };
 }

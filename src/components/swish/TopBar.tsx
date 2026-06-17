@@ -1,15 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { Bell, MapPin, User } from "lucide-react";
 import { Logo } from "./Logo";
+import { useUserLocation } from "@/hooks/useUserLocation";
 
-export function TopBar({ location = "Ikeja, Lagos" }: { location?: string }) {
+export function TopBar() {
+  const { location } = useUserLocation();
+  const display = location ? location.locationName : "Getting location…";
   return (
     <div className="flex items-center justify-between px-5 pt-6 pb-3">
       <div className="flex items-center gap-2">
         <Logo size={28} />
         <button className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1.5 text-xs font-medium shadow-soft">
           <MapPin className="h-3.5 w-3.5 text-mint-foreground" />
-          <span>{location}</span>
+          <span>{display}</span>
         </button>
       </div>
       <div className="flex items-center gap-2">
