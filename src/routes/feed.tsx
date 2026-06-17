@@ -126,14 +126,32 @@ function CreateModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [media, setMedia] = useState(0);
-  const [location, setLocation] = useState("Ikeja, Lagos");
+  const [location, setLocation] = useState("Current Location");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setCoords({ lat, lng });
+          // Attempt reverse geocoding for a meaningful location name
+          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? process.env.MAPBOX_PUBLIC_TOKEN ?? "";
+          if (token) {
+            fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
+            )
+              .then((r) => r.json())
+              .then((data) => {
+                if (data?.features?.[0]?.place_name) {
+                  setLocation(data.features[0].place_name);
+                }
+              })
+              .catch(() => {});
+          }
+        },
         () => {},
         { timeout: 4000 },
       );

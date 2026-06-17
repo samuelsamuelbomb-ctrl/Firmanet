@@ -1,9 +1,7 @@
 /**
- * Application constants — ported from swish-mock.ts
+ * Application constants.
  * Platform-agnostic.
  */
-
-export const IKEJA_CENTER = { lat: 6.6018, lng: 3.3515 };
 
 export const SIGNAL_STATE_LABELS = {
   unverified: { label: "Unverified", tone: "muted" },

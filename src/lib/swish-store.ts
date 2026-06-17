@@ -1,6 +1,6 @@
 import { useSyncExternalStore, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { IKEJA_CENTER, Signal, SignalType, SignalCategory, SignalState } from "./swish-mock";
+import { Signal, SignalType, SignalCategory, SignalState } from "./swish-mock";
 
 let state: Signal[] = [];
 const listeners = new Set<() => void>();
@@ -45,8 +45,8 @@ function fromRow(r: DbRow): Signal {
     trust: r.trust,
     reports: r.reports,
     media: r.media,
-    lat: Number(r.lat) || IKEJA_CENTER.lat,
-    lng: Number(r.lng) || IKEJA_CENTER.lng,
+    lat: Number(r.lat) || 0,
+    lng: Number(r.lng) || 0,
   };
 }
 
@@ -86,14 +86,14 @@ export const signalStore = {
       state: "unverified",
       title: input.title.trim() || "Untitled signal",
       description: input.description?.trim() || undefined,
-      location: input.location?.trim() || "Ikeja, Lagos",
+      location: input.location?.trim() || "Current Location",
       minutesAgo: 0,
       distanceKm: 0.2,
       trust: input.type === "observation" ? 32 : input.type === "update" ? 55 : 70,
       reports: 1,
       media: 0,
-      lat: input.lat ?? IKEJA_CENTER.lat,
-      lng: input.lng ?? IKEJA_CENTER.lng,
+      lat: input.lat ?? 0,
+      lng: input.lng ?? 0,
     };
     state = [s, ...state];
     emit();

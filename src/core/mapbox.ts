@@ -39,7 +39,7 @@ export function getMapboxToken(): { token: string } {
 }
 
 /**
- * Default map center (Ikeja, Lagos).
+ * Default map center (falls back to a generic center if user location is unavailable).
  */
-export const MAP_DEFAULT_CENTER = { latitude: 6.6018, longitude: 3.3515 };
-export const MAP_DEFAULT_ZOOM = 12.2;
+export const MAP_DEFAULT_CENTER = { latitude: 0, longitude: 0 };
+export const MAP_DEFAULT_ZOOM = 2;

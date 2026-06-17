@@ -21,6 +21,37 @@ export default function SOSScreen() {
   const [acks, setAcks] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [deact, setDeact] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocationName, setUserLocationName] = useState("Current Location");
+
+  // Get user's real location on mount
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setUserCoords({ lat, lng });
+          // Reverse geocode via Mapbox if token is available
+          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+          if (token) {
+            fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
+            )
+              .then((r) => r.json())
+              .then((data) => {
+                if (data?.features?.[0]?.place_name) {
+                  setUserLocationName(data.features[0].place_name);
+                }
+              })
+              .catch(() => {});
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10_000 },
+      );
+    }
+  }, []);
 
   // Hold progress timer
   useEffect(() => {
@@ -39,7 +70,7 @@ export default function SOSScreen() {
         if (!auth.user) return;
         const { data } = await supabase
           .from("sos_sessions")
-          .insert({ user_id: auth.user.id, status: "active", location: "Ikeja, Lagos" })
+          .insert({ user_id: auth.user.id, status: "active", location: userLocationName })
           .select()
           .single();
         if (data) setSessionId(data.id as string);

@@ -22,8 +22,6 @@ export interface Signal {
   lng: number;
 }
 
-export const IKEJA_CENTER = { lat: 6.6018, lng: 3.3515 };
-
 export function trustToIntensity(score: number): Intensity {
   if (score >= 80) return "danger";
   if (score >= 60) return "warn";

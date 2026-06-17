@@ -5,7 +5,7 @@ import { AppShell } from "@/components/swish/AppShell";
 import { TrustBar } from "@/components/swish/TrustBar";
 import { Locate, Layers, ShieldCheck } from "lucide-react";
 import { useSignals, useSignalsRealtime } from "@/lib/swish-store";
-import { IKEJA_CENTER, Signal, SignalCategory } from "@/lib/swish-mock";
+import { Signal, SignalCategory } from "@/lib/swish-mock";
 import { getMapboxToken } from "@/lib/mapbox.functions";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -77,8 +77,8 @@ function MapPage() {
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: "mapbox://styles/mapbox/light-v11",
-      center: [IKEJA_CENTER.lng, IKEJA_CENTER.lat],
-      zoom: 12.2,
+      center: coords ? [coords.lng, coords.lat] : [3.3515, 6.6018],
+      zoom: 14,
       attributionControl: false,
       dragPan: true,
       scrollZoom: true,
