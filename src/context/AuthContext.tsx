@@ -22,7 +22,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string, username?: string) => Promise<boolean>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -60,9 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = await signInWithEmail(email, password);
       setUser(u);
     }, []),
-    signUp: useCallback(async (email: string, password: string, name?: string) => {
-      const u = await signUpWithEmail(email, password, name);
-      setUser(u);
+    signUp: useCallback(async (email: string, password: string, name?: string, username?: string) => {
+      const u = await signUpWithEmail(email, password, name, username);
+      // If user is null, email confirmation is required — don't set as authenticated
+      if (u) setUser(u);
+      return u !== null;
     }, []),
     signInWithGoogle: useCallback(async () => {
       await googleSignIn();

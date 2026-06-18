@@ -77,16 +77,23 @@ export async function signUpWithEmail(
   email: string,
   password: string,
   name?: string,
-): Promise<AppUser> {
+  username?: string,
+): Promise<AppUser | null> {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: name ? { name } : undefined,
+      data: {
+        name: name ?? undefined,
+        username: username ?? undefined,
+      },
     },
   });
   if (error) throw error;
-  if (!data.user) throw new Error("Sign up succeeded but no user returned");
+  // If user is null, email confirmation is required — no session yet
+  if (!data.user) return null;
+  // If user exists but session is null, email confirmation is required
+  if (!data.session) return null;
   return {
     id: data.user.id,
     email: data.user.email ?? "",

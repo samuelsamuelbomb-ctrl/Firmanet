@@ -20,6 +20,7 @@ import { lightTap, mediumTap, successNotify } from "../core/haptics";
 interface ProfileRow {
   id: string;
   display_name: string | null;
+  username: string | null;
   avatar_url: string | null;
   location: string | null;
   trust_score: number;
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -40,11 +42,13 @@ export default function ProfileScreen() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
       setEmail(auth.user.email ?? "");
-      const { data } = await supabase.from("profiles").select("*").eq("id", auth.user.id).single();
+      const { data } = await (supabase as any).from("profiles").select("*").eq("id", auth.user.id).single();
       if (data) {
-        setProfile(data as ProfileRow);
-        setName(data.display_name ?? "");
-        setLocation(data.location ?? "Ikeja, Lagos");
+        const p = data as ProfileRow;
+        setProfile(p);
+        setName(p.display_name ?? "");
+        setUsername(p.username ?? "");
+        setLocation(p.location ?? "Ikeja, Lagos");
       }
     })();
   }, []);
@@ -53,7 +57,7 @@ export default function ProfileScreen() {
     if (!profile) return;
     setSaving(true);
     setMsg(null);
-    const { error } = await supabase.from("profiles").update({ display_name: name, location }).eq("id", profile.id);
+    const { error } = await (supabase as any).from("profiles").update({ display_name: name, username, location }).eq("id", profile.id);
     setSaving(false);
     setMsg(error ? error.message : "Saved");
     setTimeout(() => setMsg(null), 2500);
@@ -101,6 +105,9 @@ export default function ProfileScreen() {
 
         {/* Edit fields */}
         <View style={styles.card}>
+          <Row label="Username" icon={<MapPin size={14} color="#6B7280" />}>
+            <TextInput value={username} onChangeText={setUsername} style={styles.input} autoCapitalize="none" />
+          </Row>
           <Row label="Display name">
             <TextInput value={name} onChangeText={setName} style={styles.input} />
           </Row>

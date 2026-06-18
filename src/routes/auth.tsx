@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Shield, Mail, Lock, ArrowRight } from "lucide-react";
+import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { lightTap, mediumTap } from "@/core/haptics";
@@ -21,8 +21,10 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -36,15 +38,23 @@ function AuthPage() {
     setErr(null);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        if (!username.trim()) {
+          throw new Error("Please choose a username");
+        }
+        const { error, data } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { name },
+            data: { name, username },
           },
         });
         if (error) throw error;
+        // If no session, email confirmation is required
+        if (!data.session) {
+          setConfirming(true);
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -71,6 +81,37 @@ function AuthPage() {
     if (res.redirected) return;
     navigate({ to: "/" });
   };
+
+  // Confirmation message screen
+  if (confirming) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 py-10">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-mint text-mint-foreground shadow-soft mb-6">
+            <CheckCircle className="h-12 w-12" />
+          </div>
+          <h1 className="font-display text-2xl font-bold leading-tight mb-3">Check your email</h1>
+          <p className="text-sm text-muted-foreground text-center leading-relaxed mb-8">
+            We sent a confirmation link to{" "}
+            <span className="font-semibold text-foreground">{email}</span>.<br /><br />
+            Click the link to verify your account, then sign in.
+          </p>
+          <button
+            onClick={() => {
+              lightTap();
+              setConfirming(false);
+              setMode("signin");
+              setPassword("");
+            }}
+            className="flex items-center justify-center gap-1 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-pop active:scale-[0.98]"
+          >
+            Go to sign in
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,13 +141,23 @@ function AuthPage() {
 
         <form onSubmit={(e) => { mediumTap(); handleEmail(e); }} className="mt-8 space-y-3">
           {mode === "signup" && (
-            <Field
-              icon={<Mail className="h-4 w-4" />}
-              type="text"
-              placeholder="Display name"
-              value={name}
-              onChange={setName}
-            />
+            <>
+              <Field
+                icon={<User className="h-4 w-4" />}
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={setUsername}
+                required
+              />
+              <Field
+                icon={<Mail className="h-4 w-4" />}
+                type="text"
+                placeholder="Display name (optional)"
+                value={name}
+                onChange={setName}
+              />
+            </>
           )}
           <Field
             icon={<Mail className="h-4 w-4" />}
@@ -153,7 +204,7 @@ function AuthPage() {
         </button>
 
         <button
-          onClick={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); }}
+          onClick={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); setErr(null); }}
           className="mt-8 text-center text-xs text-muted-foreground"
         >
           {mode === "signin" ? (

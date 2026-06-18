@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Shield, Mail, Lock, ArrowRight } from "lucide-react-native";
+import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react-native";
 import { useAuth } from "../context/AuthContext";
 import { lightTap, mediumTap } from "../core/haptics";
 
@@ -32,8 +32,10 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -46,7 +48,15 @@ export default function AuthScreen() {
     setErr(null);
     try {
       if (mode === "signup") {
-        await signUp(email, password, name || undefined);
+        if (!username.trim()) {
+          throw new Error("Please choose a username");
+        }
+        const signedIn = await signUp(email, password, name || undefined, username.trim());
+        if (!signedIn) {
+          // Email confirmation required — show confirmation message
+          setConfirming(true);
+          return;
+        }
       } else {
         await signIn(email, password);
       }
@@ -68,6 +78,39 @@ export default function AuthScreen() {
       setBusy(false);
     }
   };
+
+  // Confirmation message screen
+  if (confirming) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.confirmContainer}>
+          <View style={styles.confirmIconWrap}>
+            <CheckCircle size={48} color="#2D6A4F" />
+          </View>
+          <Text style={styles.confirmTitle}>Check your email</Text>
+          <Text style={styles.confirmText}>
+            We sent a confirmation link to{"\n"}
+            <Text style={styles.confirmEmail}>{email}</Text>
+            {"\n\n"}
+            Click the link to verify your account, then sign in.
+          </Text>
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={() => {
+              lightTap();
+              setConfirming(false);
+              setMode("signin");
+              setPassword("");
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.submitText}>Go to sign in</Text>
+            <ArrowRight size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -107,12 +150,21 @@ export default function AuthScreen() {
           {/* Form */}
           <View style={styles.form}>
             {mode === "signup" && (
-              <Field
-                icon={<Mail size={16} color="#6B7280" />}
-                placeholder="Display name"
-                value={name}
-                onChangeText={setName}
-              />
+              <>
+                <Field
+                  icon={<User size={16} color="#6B7280" />}
+                  placeholder="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                />
+                <Field
+                  icon={<Mail size={16} color="#6B7280" />}
+                  placeholder="Display name (optional)"
+                  value={name}
+                  onChangeText={setName}
+                />
+              </>
             )}
             <Field
               icon={<Mail size={16} color="#6B7280" />}
@@ -173,7 +225,7 @@ export default function AuthScreen() {
 
           {/* Toggle mode */}
           <TouchableOpacity
-            onPress={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); }}
+            onPress={() => { lightTap(); setMode((m) => (m === "signin" ? "signup" : "signin")); setErr(null); }}
             style={styles.toggleBtn}
           >
             <Text style={styles.toggleText}>
@@ -240,6 +292,39 @@ function GoogleG() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F7F8FB" },
   container: { padding: 24, paddingTop: 16, flexGrow: 1 },
+  confirmContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  confirmIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#D8F3DC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    fontFamily: "Outfit",
+    color: "#1A1A2E",
+    marginBottom: 12,
+  },
+  confirmText: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  confirmEmail: {
+    fontWeight: "600",
+    color: "#1A1A2E",
+  },
   topLinks: { flexDirection: "row", justifyContent: "space-between" },
   link: { fontSize: 12, fontWeight: "600", color: "#9CA3AF" },
   header: { flexDirection: "row", gap: 12, marginTop: 40 },
