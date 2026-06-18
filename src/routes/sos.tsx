@@ -241,8 +241,8 @@ function SosPage() {
         <div className="my-10 flex flex-1 items-center justify-center">
           <button
             onPointerDown={startHold}
-            onPointerUp={cancelHold}
-            onPointerCancel={cancelHold}
+            onPointerUp={() => { if (stageRef.current === "holding") cancelHold(); }}
+            onPointerCancel={() => { if (stageRef.current === "holding") cancelHold(); }}
             className="relative flex h-56 w-56 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-danger active:scale-95"
           >
             <span className="absolute inset-0 rounded-full bg-danger/40 animate-soft-ping" />
