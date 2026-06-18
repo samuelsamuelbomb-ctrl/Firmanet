@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { lightTap, mediumTap } from "@/core/haptics";
-import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -26,7 +25,35 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const { status: usernameStatus, message: usernameMessage, check: checkUsername } = useUsernameCheck();
+  const [usernameStatus, setUsernameStatus] = useState<string | null>(null);
+  const [usernameMessage, setUsernameMessage] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkUsername = (value: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length < 2 || !/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameStatus(null);
+      setUsernameMessage(null);
+      return;
+    }
+    setUsernameStatus("checking");
+    setUsernameMessage("Checking...");
+    timerRef.current = setTimeout(async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("username")
+        .ilike("username", trimmed)
+        .maybeSingle();
+      if (data) {
+        setUsernameStatus("taken");
+        setUsernameMessage("Username is already taken");
+      } else {
+        setUsernameStatus("available");
+        setUsernameMessage("Username is available");
+      }
+    }, 400);
+  };
 
   const handleUsernameChange = (v: string) => {
     setUsername(v);
@@ -37,6 +64,9 @@ function AuthPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/" });
     });
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [navigate]);
 
   const handleEmail = async (e: React.FormEvent) => {
@@ -165,7 +195,7 @@ function AuthPage() {
                   required
                 />
                 {usernameMessage && (
-                  <p className={`mt-1 text-xs flex items-center gap-1 ${
+                  <p className={`mt-1 text-xs ${
                     usernameStatus === "available" ? "text-green-600" :
                     usernameStatus === "taken" ? "text-red-500" :
                     "text-muted-foreground"
