@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LogOut, MapPin, Shield, Save, BellRing } from "lucide-react";
+import { LogOut, MapPin, Shield, Save, BellRing, User } from "lucide-react";
 import { AppShell } from "@/components/swish/AppShell";
 import { TopBar } from "@/components/swish/TopBar";
 import { TrustBar } from "@/components/swish/TrustBar";
@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 interface ProfileRow {
   id: string;
   display_name: string | null;
+  username: string | null;
   avatar_url: string | null;
   location: string | null;
   trust_score: number;
@@ -29,6 +30,7 @@ function Profile() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -42,6 +44,7 @@ function Profile() {
       if (data) {
         setProfile(data as ProfileRow);
         setName(data.display_name ?? "");
+        setUsername(data.username ?? "");
         setLocation(data.location ?? "Ikeja, Lagos");
       }
     })();
@@ -51,12 +54,29 @@ function Profile() {
     if (!profile) return;
     setSaving(true);
     setMsg(null);
+
+    if (!username.trim()) {
+      setMsg("Username cannot be empty");
+      setSaving(false);
+      return;
+    }
+
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: name, location })
+      .update({ display_name: name, username: username.trim(), location })
       .eq("id", profile.id);
     setSaving(false);
-    setMsg(error ? error.message : "Saved");
+
+    if (error) {
+      if (error.message?.includes("unique") || error.message?.includes("duplicate")) {
+        setMsg("That username is already taken");
+      } else {
+        setMsg(error.message);
+      }
+    } else {
+      setMsg("Saved");
+    }
+
     setTimeout(() => setMsg(null), 2500);
   };
 
@@ -97,6 +117,13 @@ function Profile() {
         </div>
 
         <section className="mt-4 space-y-3 rounded-3xl bg-card p-4 shadow-soft">
+          <Row label="Username" icon={<User className="h-3.5 w-3.5" />}>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full bg-transparent text-right text-sm outline-none"
+            />
+          </Row>
           <Row label="Display name">
             <input
               value={name}

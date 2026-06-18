@@ -14,7 +14,7 @@ import { TrustBar } from "../components/shared/TrustBar";
 import { supabase } from "../core/supabase";
 import { useAuth } from "../context/AuthContext";
 import { deleteFcmToken, removeTokenFromSupabase } from "../services/notifications";
-import { LogOut, MapPin, Shield, Save, BellRing } from "lucide-react-native";
+import { LogOut, MapPin, Shield, Save, BellRing, User } from "lucide-react-native";
 import { lightTap, mediumTap, successNotify } from "../core/haptics";
 
 interface ProfileRow {
@@ -57,9 +57,30 @@ export default function ProfileScreen() {
     if (!profile) return;
     setSaving(true);
     setMsg(null);
-    const { error } = await (supabase as any).from("profiles").update({ display_name: name, username, location }).eq("id", profile.id);
+
+    if (!username.trim()) {
+      setMsg("Username cannot be empty");
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .update({ display_name: name, username: username.trim(), location })
+      .eq("id", profile.id);
+
     setSaving(false);
-    setMsg(error ? error.message : "Saved");
+
+    if (error) {
+      if (error.message?.includes("unique") || error.message?.includes("duplicate")) {
+        setMsg("That username is already taken");
+      } else {
+        setMsg(error.message);
+      }
+    } else {
+      setMsg("Saved");
+    }
+
     setTimeout(() => setMsg(null), 2500);
   };
 
@@ -105,7 +126,7 @@ export default function ProfileScreen() {
 
         {/* Edit fields */}
         <View style={styles.card}>
-          <Row label="Username" icon={<MapPin size={14} color="#6B7280" />}>
+          <Row label="Username" icon={<User size={14} color="#6B7280" />}>
             <TextInput value={username} onChangeText={setUsername} style={styles.input} autoCapitalize="none" />
           </Row>
           <Row label="Display name">
