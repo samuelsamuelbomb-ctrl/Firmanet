@@ -43,7 +43,7 @@ function AuthPage() {
       const { data } = await (supabase as any)
         .from("profiles")
         .select("username")
-        .ilike("username", trimmed)
+        .eq("username", trimmed)
         .maybeSingle();
       if (data) {
         setUsernameStatus("taken");

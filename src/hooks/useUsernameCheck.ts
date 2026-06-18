@@ -56,7 +56,7 @@ export function useUsernameCheck(currentUsername?: string) {
         const { data, error } = await (supabase as any)
           .from("profiles")
           .select("username")
-          .ilike("username", trimmed)
+          .eq("username", trimmed)
           .maybeSingle();
 
         if (error) {
