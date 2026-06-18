@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Siren, MapPin, Users, Radio, X, Check, Lock } from "lucide-react";
 import { play, stopSos } from "@/lib/swish-sound";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,15 @@ function SosPage() {
   const [deact, setDeact] = useState(false);
   const [circleCount, setCircleCount] = useState<number | null>(null);
   const [realAcks, setRealAcks] = useState<number>(0);
+
+  // Stable refs for hold tracking to avoid stale closures
+  const holdRef = useRef(0);
+  const stageRef = useRef(stage);
+  const pointerIdRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep stageRef in sync
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
   // Fetch real circle member count
   useEffect(() => {
@@ -57,16 +66,7 @@ function SosPage() {
     return () => { void supabase.removeChannel(ch); };
   }, [stage, sessionId]);
 
-  useEffect(() => {
-    if (stage !== "holding") return;
-    if (hold >= 100) {
-      setStage("armed");
-      return;
-    }
-    const t = setTimeout(() => setHold((h) => h + 4), 60);
-    return () => clearTimeout(t);
-  }, [stage, hold]);
-
+  // Sound effects on stage transitions
   useEffect(() => {
     if (stage === "armed") play("danger");
     if (stage === "active") {
@@ -99,17 +99,51 @@ function SosPage() {
     void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(acks + realAcks, SOS_CIRCLE_SIZE) }).eq("id", sessionId);
   }, [acks, realAcks, sessionId]);
 
-  const startHold = () => {
-    setHold(0);
-    setStage("holding");
-    heavyTap();
-  };
-  const cancel = () => {
+  const cancelHold = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pointerIdRef.current = null;
+    holdRef.current = 0;
     setHold(0);
     setStage("ready");
     stopSos();
     lightTap();
   };
+
+  const startHold = (e: React.PointerEvent) => {
+    // Capture this pointer so we don't respond to others
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    pointerIdRef.current = e.pointerId;
+
+    holdRef.current = 0;
+    setHold(0);
+    setStage("holding");
+    heavyTap();
+
+    // Start the hold loop
+    const tick = () => {
+      if (stageRef.current !== "holding") return;
+      holdRef.current += 4;
+      setHold(holdRef.current);
+      if (holdRef.current >= 100) {
+        setStage("armed");
+        return;
+      }
+      timerRef.current = setTimeout(tick, 60);
+    };
+    timerRef.current = setTimeout(tick, 60);
+  };
+
+  // Clean up hold tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   const endEmergency = () => {
     setDeact(true);
     lightTap();
@@ -207,8 +241,8 @@ function SosPage() {
         <div className="my-10 flex flex-1 items-center justify-center">
           <button
             onPointerDown={startHold}
-            onPointerUp={() => stage === "holding" && cancel()}
-            onPointerLeave={() => stage === "holding" && cancel()}
+            onPointerUp={cancelHold}
+            onPointerCancel={cancelHold}
             className="relative flex h-56 w-56 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-danger active:scale-95"
           >
             <span className="absolute inset-0 rounded-full bg-danger/40 animate-soft-ping" />
@@ -242,7 +276,7 @@ function SosPage() {
         {stage === "armed" ? (
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
-              onClick={cancel}
+              onClick={cancelHold}
               className="rounded-2xl bg-muted py-4 font-semibold"
             >
               Cancel
@@ -282,7 +316,8 @@ function genCode() {
 
 function DeactivateModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
   const [secs, setSecs] = useState(10);
-  const code = useMemo(genCode, []);
+  // Generate code once and keep it stable via ref so re-renders don't reset it
+  const codeRef = useRef(genCode());
   const [entry, setEntry] = useState("");
 
   useEffect(() => {
@@ -292,7 +327,7 @@ function DeactivateModal({ onCancel, onConfirm }: { onCancel: () => void; onConf
   }, [secs]);
 
   const ready = secs === 0;
-  const match = entry.trim().toUpperCase() === code;
+  const match = entry.trim().toUpperCase() === codeRef.current;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/40 backdrop-blur-sm">
@@ -317,7 +352,7 @@ function DeactivateModal({ onCancel, onConfirm }: { onCancel: () => void; onConf
           <>
             <div className="mt-6 rounded-3xl bg-card p-5 text-center shadow-soft">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Enter this code</p>
-              <div className="mt-2 font-display text-3xl font-bold tracking-[0.4em]">{code}</div>
+              <div className="mt-2 font-display text-3xl font-bold tracking-[0.4em]">{codeRef.current}</div>
             </div>
             <input
               autoFocus

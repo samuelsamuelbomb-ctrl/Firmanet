@@ -2,6 +2,7 @@
  * Firebase Cloud Messaging (FCM) service — iOS & Android push notifications.
  *
  * Uses @react-native-firebase/messaging for native FCM integration.
+ * NOTE: This module is lazy-loaded to avoid crashes in Expo Go.
  * Tokens are synced to Supabase so the server can send targeted pushes.
  *
  * Notification types handled:
@@ -13,9 +14,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Platform, Alert } from "react-native";
-import messaging, {
-  FirebaseMessagingTypes,
-} from "@react-native-firebase/messaging";
 import { supabase } from "../core/supabase";
 
 // ─── Types ───
@@ -40,6 +38,21 @@ export interface PushNotificationData {
 
 export type NotificationHandler = (data: PushNotificationData) => void;
 
+// ─── Lazy module loader for @react-native-firebase/messaging ───
+
+let _messagingModule: any = null;
+
+async function getMessaging(): Promise<any> {
+  if (_messagingModule) return _messagingModule;
+  try {
+    _messagingModule = await import("@react-native-firebase/messaging");
+    return _messagingModule;
+  } catch {
+    console.log("[FCM] @react-native-firebase/messaging not available (Expo Go)");
+    return null;
+  }
+}
+
 // ─── Permissions ───
 
 /**
@@ -49,7 +62,10 @@ export type NotificationHandler = (data: PushNotificationData) => void;
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   try {
-    const authStatus = await messaging().requestPermission();
+    const mod = await getMessaging();
+    if (!mod) return false;
+    const messaging = mod.default;
+    const authStatus = await messaging.requestPermission();
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
@@ -75,7 +91,9 @@ export async function requestNotificationPermission(): Promise<boolean> {
  */
 export async function getFcmToken(): Promise<string | null> {
   try {
-    const token = await messaging().getToken();
+    const mod = await getMessaging();
+    if (!mod) return null;
+    const token = await mod.default.getToken();
     return token;
   } catch (error) {
     console.error("[FCM] Failed to get token:", error);
@@ -88,7 +106,9 @@ export async function getFcmToken(): Promise<string | null> {
  */
 export async function deleteFcmToken(): Promise<void> {
   try {
-    await messaging().deleteToken();
+    const mod = await getMessaging();
+    if (!mod) return;
+    await mod.default.deleteToken();
     console.log("[FCM] Token deleted");
   } catch (error) {
     console.error("[FCM] Failed to delete token:", error);
@@ -147,9 +167,9 @@ export async function removeTokenFromSupabase(): Promise<void> {
  * Parse FCM remote message data into typed PushNotificationData.
  */
 function parseMessageData(
-  message: FirebaseMessagingTypes.RemoteMessage
+  message: any
 ): PushNotificationData | null {
-  const data = message.data;
+  const data = message?.data;
   if (!data) return null;
 
   // Validate the kind field
@@ -186,7 +206,7 @@ function parseMessageData(
  * Returns the parsed notification data or null.
  */
 export function handleNotificationOpen(
-  message: FirebaseMessagingTypes.RemoteMessage
+  message: any
 ): PushNotificationData | null {
   return parseMessageData(message);
 }
@@ -244,62 +264,85 @@ export function useFCM(
   useEffect(() => {
     if (!hasPermission) return;
 
-    const unsubscribe = messaging().onMessage(async (message) => {
-      const data = parseMessageData(message);
-      if (!data) return;
+    let unsubscribe: (() => void) | undefined;
 
-      console.log("[FCM] Foreground message:", data.kind, data.title);
+    void (async () => {
+      const mod = await getMessaging();
+      if (!mod) return;
+      const messaging = mod.default;
+      unsubscribe = messaging.onMessage(async (message: any) => {
+        const data = parseMessageData(message);
+        if (!data) return;
+        console.log("[FCM] Foreground message:", data.kind, data.title);
+      });
+    })();
 
-      // For foreground, we can show an in-app alert or let the
-      // NotificationsScreen pick it up via Realtime subscription.
-      // The Supabase Realtime subscription in NotificationsScreen
-      // will handle inserting the notification into the local list.
-    });
-
-    return unsubscribe;
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [hasPermission]);
 
   // Handle notification that opened the app (from quit state)
   useEffect(() => {
     if (!hasPermission) return;
 
-    messaging()
-      .getInitialNotification()
-      .then((message) => {
-        if (message) {
-          const data = parseMessageData(message);
-          if (data && handlerRef.current) {
-            handlerRef.current(data);
-          }
+    void (async () => {
+      const mod = await getMessaging();
+      if (!mod) return;
+      const messaging = mod.default;
+      const message = await messaging.getInitialNotification();
+      if (message) {
+        const data = parseMessageData(message);
+        if (data && handlerRef.current) {
+          handlerRef.current(data);
         }
-      });
+      }
+    })();
   }, [hasPermission]);
 
   // Handle notification tap while app is in background
   useEffect(() => {
     if (!hasPermission) return;
 
-    const unsubscribe = messaging().onNotificationOpenedApp((message) => {
-      const data = parseMessageData(message);
-      if (data && handlerRef.current) {
-        handlerRef.current(data);
-      }
-    });
+    let unsubscribe: (() => void) | undefined;
 
-    return unsubscribe;
+    void (async () => {
+      const mod = await getMessaging();
+      if (!mod) return;
+      const messaging = mod.default;
+      unsubscribe = messaging.onNotificationOpenedApp((message: any) => {
+        const data = parseMessageData(message);
+        if (data && handlerRef.current) {
+          handlerRef.current(data);
+        }
+      });
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [hasPermission]);
 
   // Handle token refresh
   useEffect(() => {
     if (!hasPermission) return;
 
-    const unsubscribe = messaging().onTokenRefresh(async (newToken) => {
-      console.log("[FCM] Token refreshed");
-      setFcmToken(newToken);
-      await syncTokenToSupabase(newToken);
-    });
+    let unsubscribe: (() => void) | undefined;
 
-    return unsubscribe;
+    void (async () => {
+      const mod = await getMessaging();
+      if (!mod) return;
+      const messaging = mod.default;
+      unsubscribe = messaging.onTokenRefresh(async (newToken: string) => {
+        console.log("[FCM] Token refreshed");
+        setFcmToken(newToken);
+        await syncTokenToSupabase(newToken);
+      });
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [hasPermission]);
 
   return {
@@ -318,45 +361,40 @@ export function useFCM(
 export function createNotificationChannels(): void {
   if (Platform.OS !== "android") return;
 
-  // Android channels are created via @react-native-firebase/messaging
-  // This is handled automatically, but we can customize channel importance.
   try {
     const channels = [
       {
         channelId: "sos_alerts",
         channelName: "SOS Alerts",
-        importance: 4, // IMPORTANCE_HIGH
+        importance: 4,
         description: "Emergency SOS alerts from your circle",
       },
       {
         channelId: "danger_alerts",
         channelName: "Nearby Danger",
-        importance: 4, // IMPORTANCE_HIGH
+        importance: 4,
         description: "High-trust danger alerts near your location",
       },
       {
         channelId: "verified_alerts",
         channelName: "Verified Incidents",
-        importance: 3, // IMPORTANCE_DEFAULT
+        importance: 3,
         description: "Incidents that have reached verified status",
       },
       {
         channelId: "circle",
         channelName: "Circle Notifications",
-        importance: 2, // IMPORTANCE_LOW
+        importance: 2,
         description: "Circle requests and updates",
       },
       {
         channelId: "system",
         channelName: "System Notifications",
-        importance: 1, // IMPORTANCE_MIN
+        importance: 1,
         description: "System updates and info",
       },
     ];
 
-    // @react-native-firebase/messaging doesn't have a direct channel
-    // creation API. This is handled via notifee or expo-notifications.
-    // For minimal setup, we rely on the default channel.
     console.log("[FCM] Android channels configured:", channels.length);
   } catch (error) {
     console.error("[FCM] Failed to create channels:", error);
