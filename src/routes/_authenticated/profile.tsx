@@ -49,12 +49,13 @@ function Profile() {
     setUsernameStatus("checking");
     setUsernameMessage("Checking...");
     timerRef.current = setTimeout(async () => {
-      const { data } = await (supabase as any)
+      const { count } = await (supabase as any)
         .from("profiles")
-        .select("username")
-        .eq("username", trimmed)
-        .maybeSingle();
-      if (data && data.username?.toLowerCase() !== (profile?.username ?? "").toLowerCase()) {
+        .select("username", { count: "exact", head: true })
+        .ilike("username", trimmed);
+      const currentUsername = profile?.username ?? "";
+      const isOwnUsername = trimmed.toLowerCase() === currentUsername.toLowerCase();
+      if (count && count > 0 && !isOwnUsername) {
         setUsernameStatus("taken");
         setUsernameMessage("Username is already taken");
       } else {

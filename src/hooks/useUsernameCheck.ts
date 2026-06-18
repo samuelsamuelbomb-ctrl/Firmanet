@@ -1,8 +1,7 @@
 /**
  * useUsernameCheck — Debounced username availability checker.
  *
- * Queries the profiles table to check if a username is already taken.
- * Excludes the current user's own username when editing their profile.
+ * Uses case-insensitive matching via ilike() with limit(1).
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -14,16 +13,25 @@ export function useUsernameCheck(currentUsername?: string) {
   const [status, setStatus] = useState<UsernameStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   const check = (value: string) => {
-    // Clear previous debounce
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
     const trimmed = value.trim();
 
-    // Validation
     if (!trimmed) {
       setStatus("idle");
       setMessage(null);
@@ -53,19 +61,20 @@ export function useUsernameCheck(currentUsername?: string) {
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data, error } = await (supabase as any)
+        // Use case-insensitive exact match with limit(1)
+        const { count, error } = await (supabase as any)
           .from("profiles")
-          .select("username")
-          .eq("username", trimmed)
-          .maybeSingle();
+          .select("username", { count: "exact", head: true })
+          .ilike("username", trimmed);
 
+        if (!mountedRef.current) return;
         if (error) {
           setStatus("idle");
           setMessage(null);
           return;
         }
 
-        if (data) {
+        if (count && count > 0) {
           setStatus("taken");
           setMessage("Username is already taken");
         } else {
@@ -73,19 +82,13 @@ export function useUsernameCheck(currentUsername?: string) {
           setMessage("Username is available");
         }
       } catch {
-        setStatus("idle");
-        setMessage(null);
+        if (mountedRef.current) {
+          setStatus("idle");
+          setMessage(null);
+        }
       }
     }, 400);
   };
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, []);
 
   return { status, message, check };
 }
