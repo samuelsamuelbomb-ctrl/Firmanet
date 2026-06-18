@@ -19,9 +19,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react-native";
+import { Shield, Mail, Lock, ArrowRight, User, CheckCircle, AlertCircle } from "lucide-react-native";
 import { useAuth } from "../context/AuthContext";
 import { lightTap, mediumTap } from "../core/haptics";
+import { useUsernameCheck } from "../hooks/useUsernameCheck";
 
 type AuthMode = "signin" | "signup";
 
@@ -36,6 +37,12 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const { status: usernameStatus, message: usernameMessage, check: checkUsername } = useUsernameCheck();
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    checkUsername(v);
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -50,6 +57,12 @@ export default function AuthScreen() {
       if (mode === "signup") {
         if (!username.trim()) {
           throw new Error("Please choose a username");
+        }
+        if (usernameStatus === "taken") {
+          throw new Error("That username is already taken");
+        }
+        if (usernameStatus === "checking") {
+          throw new Error("Please wait while we check if the username is available");
         }
         const signedIn = await signUp(email, password, name || undefined, username.trim());
         if (!signedIn) {
@@ -151,13 +164,26 @@ export default function AuthScreen() {
           <View style={styles.form}>
             {mode === "signup" && (
               <>
-                <Field
-                  icon={<User size={16} color="#6B7280" />}
-                  placeholder="Username"
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                />
+                <View>
+                  <Field
+                    icon={<User size={16} color="#6B7280" />}
+                    placeholder="Username"
+                    value={username}
+                    onChangeText={handleUsernameChange}
+                    autoCapitalize="none"
+                  />
+                  {usernameMessage && (
+                    <View style={styles.usernameHint}>
+                      <AlertCircle size={12} color={usernameStatus === "available" ? "#2D6A4F" : usernameStatus === "taken" ? "#E63946" : "#6B7280"} />
+                      <Text style={[
+                        styles.usernameHintText,
+                        { color: usernameStatus === "available" ? "#2D6A4F" : usernameStatus === "taken" ? "#E63946" : "#6B7280" }
+                      ]}>
+                        {usernameMessage}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Field
                   icon={<Mail size={16} color="#6B7280" />}
                   placeholder="Display name (optional)"
@@ -389,4 +415,14 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 12, color: "#9CA3AF" },
   toggleBold: { fontWeight: "600", color: "#1A1A2E" },
   footer: { marginTop: 24, fontSize: 10, color: "#9CA3AF", textAlign: "center" },
+  usernameHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  usernameHintText: {
+    fontSize: 11,
+  },
 });

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { LogOut, MapPin, Shield, Save, BellRing, User } from "lucide-react";
 import { AppShell } from "@/components/swish/AppShell";
 import { TopBar } from "@/components/swish/TopBar";
@@ -34,6 +34,40 @@ function Profile() {
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<string | null>(null);
+  const [usernameMessage, setUsernameMessage] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkUsername = (value: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length < 2 || !/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameStatus(null);
+      setUsernameMessage(null);
+      return;
+    }
+    setUsernameStatus("checking");
+    setUsernameMessage("Checking...");
+    timerRef.current = setTimeout(async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("username")
+        .ilike("username", trimmed)
+        .maybeSingle();
+      if (data && data.username?.toLowerCase() !== (profile?.username ?? "").toLowerCase()) {
+        setUsernameStatus("taken");
+        setUsernameMessage("Username is already taken");
+      } else {
+        setUsernameStatus("available");
+        setUsernameMessage("Username is available");
+      }
+    }, 400);
+  };
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    checkUsername(v);
+  };
 
   useEffect(() => {
     void (async () => {
@@ -48,6 +82,9 @@ function Profile() {
         setLocation(data.location ?? "Ikeja, Lagos");
       }
     })();
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const save = async () => {
@@ -61,7 +98,13 @@ function Profile() {
       return;
     }
 
-    const { error } = await supabase
+    if (usernameStatus === "taken") {
+      setMsg("That username is already taken");
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await (supabase as any)
       .from("profiles")
       .update({ display_name: name, username: username.trim(), location })
       .eq("id", profile.id);
@@ -120,10 +163,19 @@ function Profile() {
           <Row label="Username" icon={<User className="h-3.5 w-3.5" />}>
             <input
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => handleUsernameChange(e.target.value)}
               className="w-full bg-transparent text-right text-sm outline-none"
             />
           </Row>
+          {usernameMessage && (
+            <p className={`-mt-2 text-xs ${
+              usernameStatus === "available" ? "text-green-600" :
+              usernameStatus === "taken" ? "text-red-500" :
+              "text-muted-foreground"
+            }`}>
+              {usernameMessage}
+            </p>
+          )}
           <Row label="Display name">
             <input
               value={name}

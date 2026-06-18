@@ -4,6 +4,7 @@ import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { lightTap, mediumTap } from "@/core/haptics";
+import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -25,6 +26,12 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const { status: usernameStatus, message: usernameMessage, check: checkUsername } = useUsernameCheck();
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    checkUsername(v);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -40,6 +47,12 @@ function AuthPage() {
       if (mode === "signup") {
         if (!username.trim()) {
           throw new Error("Please choose a username");
+        }
+        if (usernameStatus === "taken") {
+          throw new Error("That username is already taken");
+        }
+        if (usernameStatus === "checking") {
+          throw new Error("Please wait while we check if the username is available");
         }
         const { error, data } = await supabase.auth.signUp({
           email,
@@ -142,14 +155,25 @@ function AuthPage() {
         <form onSubmit={(e) => { mediumTap(); handleEmail(e); }} className="mt-8 space-y-3">
           {mode === "signup" && (
             <>
-              <Field
-                icon={<User className="h-4 w-4" />}
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={setUsername}
-                required
-              />
+              <div>
+                <Field
+                  icon={<User className="h-4 w-4" />}
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={handleUsernameChange}
+                  required
+                />
+                {usernameMessage && (
+                  <p className={`mt-1 text-xs flex items-center gap-1 ${
+                    usernameStatus === "available" ? "text-green-600" :
+                    usernameStatus === "taken" ? "text-red-500" :
+                    "text-muted-foreground"
+                  }`}>
+                    {usernameMessage}
+                  </p>
+                )}
+              </div>
               <Field
                 icon={<Mail className="h-4 w-4" />}
                 type="text"

@@ -14,8 +14,9 @@ import { TrustBar } from "../components/shared/TrustBar";
 import { supabase } from "../core/supabase";
 import { useAuth } from "../context/AuthContext";
 import { deleteFcmToken, removeTokenFromSupabase } from "../services/notifications";
-import { LogOut, MapPin, Shield, Save, BellRing, User } from "lucide-react-native";
+import { LogOut, MapPin, Shield, Save, BellRing, User, AlertCircle } from "lucide-react-native";
 import { lightTap, mediumTap, successNotify } from "../core/haptics";
+import { useUsernameCheck } from "../hooks/useUsernameCheck";
 
 interface ProfileRow {
   id: string;
@@ -36,6 +37,7 @@ export default function ProfileScreen() {
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const { status: usernameStatus, message: usernameMessage, check: checkUsername } = useUsernameCheck(profile?.username ?? undefined);
 
   useEffect(() => {
     void (async () => {
@@ -49,9 +51,15 @@ export default function ProfileScreen() {
         setName(p.display_name ?? "");
         setUsername(p.username ?? "");
         setLocation(p.location ?? "Ikeja, Lagos");
+        checkUsername(p.username ?? "");
       }
     })();
   }, []);
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    checkUsername(v);
+  };
 
   const save = async () => {
     if (!profile) return;
@@ -60,6 +68,12 @@ export default function ProfileScreen() {
 
     if (!username.trim()) {
       setMsg("Username cannot be empty");
+      setSaving(false);
+      return;
+    }
+
+    if (usernameStatus === "taken") {
+      setMsg("That username is already taken");
       setSaving(false);
       return;
     }
@@ -127,8 +141,20 @@ export default function ProfileScreen() {
         {/* Edit fields */}
         <View style={styles.card}>
           <Row label="Username" icon={<User size={14} color="#6B7280" />}>
-            <TextInput value={username} onChangeText={setUsername} style={styles.input} autoCapitalize="none" />
+            <TextInput value={username} onChangeText={handleUsernameChange} style={styles.input} autoCapitalize="none" />
           </Row>
+          {usernameMessage && (
+            <View style={styles.usernameHint}>
+              <AlertCircle size={12} color={usernameStatus === "available" ? "#2D6A4F" : usernameStatus === "taken" ? "#E63946" : "#6B7280"} />
+              <Text style={{
+                fontSize: 11,
+                color: usernameStatus === "available" ? "#2D6A4F" : usernameStatus === "taken" ? "#E63946" : "#6B7280",
+                marginLeft: 4,
+              }}>
+                {usernameMessage}
+              </Text>
+            </View>
+          )}
           <Row label="Display name">
             <TextInput value={name} onChangeText={setName} style={styles.input} />
           </Row>
@@ -212,4 +238,10 @@ const styles = StyleSheet.create({
   navArrow: { fontSize: 11, color: "#6B7280" },
   signOutBtn: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, backgroundColor: "#E5E7EB", paddingVertical: 14, borderRadius: 16, marginBottom: 24 },
   signOutText: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
+  usernameHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
 });
