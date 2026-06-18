@@ -243,7 +243,7 @@ function SosPage() {
             onPointerDown={startHold}
             onPointerUp={() => { if (stageRef.current === "holding") cancelHold(); }}
             onPointerCancel={() => { if (stageRef.current === "holding") cancelHold(); }}
-            className="relative flex h-56 w-56 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-danger active:scale-95"
+            className="relative flex h-56 w-56 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-danger active:scale-95 select-none"
           >
             <span className="absolute inset-0 rounded-full bg-danger/40 animate-soft-ping" />
             <svg className="absolute inset-0 -rotate-90" viewBox="0 0 224 224">
