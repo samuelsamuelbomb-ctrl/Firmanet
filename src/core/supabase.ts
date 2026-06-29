@@ -5,17 +5,57 @@
  * Environment variables (set in .env or EAS Build secrets):
  *   EXPO_PUBLIC_SUPABASE_URL
  *   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ *
+ * NOTE: React Native imports are lazy-loaded to prevent
+ * TurboModuleRegistry.getEnforcing('PlatformConstants') crashes at module evaluation time.
+ * Also avoids crashes in Expo Go where @react-native-async-storage/async-storage
+ * is not available as a pre-installed module.
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { AppState } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { Database } from "@/integrations/supabase/types";
+
 /**
- * NOTE: Replace `Record<string, never>` below with your generated Supabase types.
- * Generate them via: `npx supabase gen types typescript --local > src/core/supabase-types.ts`
- * Then change the Database type alias to: `import { Database } from "./supabase-types"`
+ * Returns a storage adapter compatible with Supabase's auth.storage option.
+ * Tries @react-native-async-storage/async-storage first (bare RN / dev builds),
+ * falls back to expo-secure-store (Expo managed), then in-memory as last resort.
  */
-type Database = Record<string, never>;
+function getStorageAdapter(): any {
+  // 1. Try @react-native-async-storage/async-storage (bare RN, dev builds)
+  try {
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    if (AsyncStorage) return AsyncStorage;
+  } catch {
+    // not available — continue
+  }
+
+  // 2. Try expo-secure-store (Expo managed / Expo Go compatible)
+  try {
+    const SecureStore = require("expo-secure-store");
+    if (SecureStore && SecureStore.getItemAsync) {
+      return {
+        getItem: (key: string) => SecureStore.getItemAsync(key),
+        setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+        removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+      };
+    }
+  } catch {
+    // not available — continue
+  }
+
+  // 3. Fall back to localStorage (web) or in-memory (RN without storage)
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage;
+  }
+
+  // 4. In-memory fallback for SSR / environments without any storage
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+    removeItem: (key: string) => { store.delete(key); },
+  };
+}
 
 function createSupabaseClient() {
   const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
@@ -33,7 +73,7 @@ function createSupabaseClient() {
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
-      storage: AsyncStorage,
+      storage: getStorageAdapter(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false, // RN doesn't use URL-based session detection
@@ -43,10 +83,18 @@ function createSupabaseClient() {
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 
+// Export the Supabase URL synchronously for building storage URLs
+// This is populated when the proxy first initializes
+export let SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+
 // Lazy singleton with proxy pattern (same as web version)
 export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
   get(_, prop, receiver) {
-    if (!_supabase) _supabase = createSupabaseClient();
+    if (!_supabase) {
+      _supabase = createSupabaseClient();
+      // Grab the URL from the created client (process.env may be empty at module load in RN)
+      SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL as string) || (_supabase as any).supabaseUrl || "";
+    }
     return Reflect.get(_supabase, prop, receiver);
   },
 });
@@ -56,8 +104,16 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
  * Call this in your App.tsx root component.
  */
 export function setupSupabaseAppStateListener() {
-  const handleAppStateChange = (nextState: string) => {
-    if (nextState === "active") {
+  // Lazy-require AppState to avoid eager TurboModule resolution at module evaluation time.
+  let AppState: any = null;
+  try {
+    AppState = require("react-native").AppState;
+  } catch {
+    return () => {}; // No-op on web / SSR
+  }
+
+  const handleAppStateChange = (nextAppState: string) => {
+    if (nextAppState === "active") {
       supabase.auth.startAutoRefresh();
     } else {
       supabase.auth.stopAutoRefresh();
@@ -69,4 +125,3 @@ export function setupSupabaseAppStateListener() {
     subscription.remove();
   };
 }
-

@@ -3,6 +3,9 @@
  *
  * Ported from /_authenticated/notifications.tsx
  * Protected screen: requires auth
+ *
+ * FIXED: Navigation now uses getParent() to reach the RootStack
+ *        which has MainStack/MainTabs defined.
  */
 
 import { useEffect, useState } from "react";
@@ -38,6 +41,9 @@ export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Get the root navigator for navigating to MainStack/MainTabs
+  const rootNav = navigation.getParent();
 
   useEffect(() => {
     let mounted = true;
@@ -78,26 +84,50 @@ export default function NotificationsScreen() {
     setItems((arr) => arr.map((n) => ({ ...n, read: true })));
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
-    await supabase.from("notifications").update({ read: true }).eq("user_id", auth.user.id).eq("read", false);
+    await (supabase.from("notifications") as any).update({ read: true }).eq("user_id", auth.user.id).eq("read", false);
   };
 
   const open = async (n: Notif) => {
     if (!n.read) {
       setItems((arr) => arr.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-      void supabase.from("notifications").update({ read: true }).eq("id", n.id);
+      void (supabase.from("notifications") as any).update({ read: true }).eq("id", n.id);
     }
     lightTap();
     const d = n.data ?? {};
-    if (d.signal_id) { navigation.navigate("IncidentDetail", { id: d.signal_id }); return; }
-    if (d.request_id || n.kind === "circle_request" || n.kind === "circle_accepted") { navigation.navigate("CircleTab"); return; }
-    if (d.sos_id || n.kind === "sos") { navigation.navigate("MapTab"); return; }
+    if (d.signal_id) {
+      // Navigate to IncidentDetail in MainStack
+      if (rootNav) {
+        rootNav.navigate("MainStack", { screen: "IncidentDetail", params: { id: d.signal_id } });
+      } else {
+        navigation.navigate("IncidentDetail", { id: d.signal_id });
+      }
+      return;
+    }
+    if (d.request_id || n.kind === "circle_request" || n.kind === "circle_accepted") {
+      // Navigate to Circle tab in MainTabs
+      if (rootNav) {
+        rootNav.navigate("MainTabs", { screen: "CircleTab" });
+      } else {
+        navigation.navigate("CircleTab");
+      }
+      return;
+    }
+    if (d.sos_id || n.kind === "sos") {
+      // Navigate to Map tab in MainTabs
+      if (rootNav) {
+        rootNav.navigate("MainTabs", { screen: "MapTab" });
+      } else {
+        navigation.navigate("MapTab");
+      }
+      return;
+    }
   };
 
   const unread = items.filter((n) => !n.read).length;
 
   return (
     <AppShell>
-      <TopBar />
+      <TopBar hideBell hideProfile={false} />
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Notifications</Text>

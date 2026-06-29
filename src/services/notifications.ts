@@ -1,8 +1,7 @@
 /**
- * Firebase Cloud Messaging (FCM) service — iOS & Android push notifications.
+ * Expo Push Notifications Service — iOS & Android
  *
- * Uses @react-native-firebase/messaging for native FCM integration.
- * NOTE: This module is lazy-loaded to avoid crashes in Expo Go.
+ * Uses expo-notifications for push notifications in Expo managed projects.
  * Tokens are synced to Supabase so the server can send targeted pushes.
  *
  * Notification types handled:
@@ -12,9 +11,21 @@
  *   - Circle requests (someone wants to join your circle)
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Platform, Alert } from "react-native";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 import { supabase } from "../core/supabase";
+import Constants from "expo-constants";
+
+// Set notification handler to show alerts while app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 // ─── Types ───
 
@@ -38,91 +49,80 @@ export interface PushNotificationData {
 
 export type NotificationHandler = (data: PushNotificationData) => void;
 
-// ─── Lazy module loader for @react-native-firebase/messaging ───
-
-let _messagingModule: any = null;
-
-async function getMessaging(): Promise<any> {
-  if (_messagingModule) return _messagingModule;
-  try {
-    _messagingModule = await import("@react-native-firebase/messaging");
-    return _messagingModule;
-  } catch {
-    console.log("[FCM] @react-native-firebase/messaging not available (Expo Go)");
-    return null;
-  }
-}
-
 // ─── Permissions ───
 
 /**
  * Request notification permissions from the user.
- * iOS shows a system dialog; Android grants automatically after install.
  * Returns true if permission was granted.
  */
 export async function requestNotificationPermission(): Promise<boolean> {
-  try {
-    const mod = await getMessaging();
-    if (!mod) return false;
-    const messaging = mod.default;
-    const authStatus = await messaging.requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-    if (!enabled) {
-      console.log("[FCM] Permission denied by user");
-      return false;
-    }
-
-    console.log("[FCM] Permission granted:", authStatus);
-    return true;
-  } catch (error) {
-    console.error("[FCM] Permission request failed:", error);
+  if (!Device.isDevice) {
+    Alert.alert(
+      "Physical Device Required",
+      "Push notifications only work on physical devices, not simulators."
+    );
     return false;
   }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+
+  if (finalStatus !== "granted") {
+    console.log("[Notifications] Permission denied by user");
+    return false;
+  }
+
+  console.log("[Notifications] Permission granted");
+  return true;
 }
 
 // ─── Token Management ───
 
 /**
- * Get the current FCM device token.
+ * Get the current Expo push token.
  * Returns null if the token cannot be retrieved.
  */
-export async function getFcmToken(): Promise<string | null> {
+export async function getExpoPushToken(): Promise<string | null> {
   try {
-    const mod = await getMessaging();
-    if (!mod) return null;
-    const token = await mod.default.getToken();
+    // Check if we're in Expo Go, which doesn't support remote notifications
+    if (Constants.appOwnership === 'expo') {
+      console.log("[Notifications] Running in Expo Go, skipping push token retrieval");
+      return null;
+    }
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+      console.log("[Notifications] No projectId found, skipping token retrieval");
+      return null;
+    }
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    console.log("[Notifications] Expo Push Token:", token);
     return token;
   } catch (error) {
-    console.error("[FCM] Failed to get token:", error);
+    console.error("[Notifications] Failed to get token:", error);
     return null;
   }
 }
 
 /**
- * Delete the current FCM token (called on sign out).
- */
-export async function deleteFcmToken(): Promise<void> {
-  try {
-    const mod = await getMessaging();
-    if (!mod) return;
-    await mod.default.deleteToken();
-    console.log("[FCM] Token deleted");
-  } catch (error) {
-    console.error("[FCM] Failed to delete token:", error);
-  }
-}
-
-/**
- * Sync the FCM token to Supabase for server-side push targeting.
+ * Sync the Expo push token to Supabase for server-side push targeting.
  * Stores in the `device_tokens` table associated with the current user.
  */
-export async function syncTokenToSupabase(token: string): Promise<void> {
+export async function syncTokenToSupabase(token: string | null): Promise<void> {
+  if (!token) {
+    console.log("[Notifications] No token to sync");
+    return;
+  }
+
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
-    console.log("[FCM] No authenticated user, skipping token sync");
+    console.log("[Notifications] No authenticated user, skipping token sync");
     return;
   }
 
@@ -139,9 +139,9 @@ export async function syncTokenToSupabase(token: string): Promise<void> {
   );
 
   if (error) {
-    console.error("[FCM] Failed to sync token to Supabase:", error.message);
+    console.error("[Notifications] Failed to sync token to Supabase:", error.message);
   } else {
-    console.log("[FCM] Token synced to Supabase");
+    console.log("[Notifications] Token synced to Supabase");
   }
 }
 
@@ -164,12 +164,12 @@ export async function removeTokenFromSupabase(): Promise<void> {
 // ─── Event Handlers ───
 
 /**
- * Parse FCM remote message data into typed PushNotificationData.
+ * Parse notification data into typed PushNotificationData.
  */
-function parseMessageData(
-  message: any
+function parseNotificationData(
+  notification: Notifications.Notification
 ): PushNotificationData | null {
-  const data = message?.data;
+  const data = notification.request.content.data;
   if (!data) return null;
 
   // Validate the kind field
@@ -186,14 +186,14 @@ function parseMessageData(
   ];
 
   if (!validKinds.includes(kind)) {
-    console.warn("[FCM] Unknown notification kind:", kind);
+    console.warn("[Notifications] Unknown notification kind:", kind);
     return null;
   }
 
   return {
     kind,
-    title: data.title ?? "Firmanet Alert",
-    body: data.body ?? undefined,
+    title: data.title ?? notification.request.content.title ?? "Firmanet Alert",
+    body: data.body ?? notification.request.content.body ?? undefined,
     signal_id: data.signal_id ?? undefined,
     sos_id: data.sos_id ?? undefined,
     request_id: data.request_id ?? undefined,
@@ -201,31 +201,21 @@ function parseMessageData(
   };
 }
 
-/**
- * Handle a push notification that was tapped / opened by the user.
- * Returns the parsed notification data or null.
- */
-export function handleNotificationOpen(
-  message: any
-): PushNotificationData | null {
-  return parseMessageData(message);
-}
-
 // ─── React Hook ───
 
 /**
- * useFCM — React hook that initialises FCM, requests permissions,
- * syncs the token, and provides navigation helpers for push notifications.
+ * useNotifications — React hook that initialises Expo Notifications,
+ * requests permissions, syncs the token, and provides navigation helpers.
  *
  * Usage: call once in App.tsx (or root component).
  *
- * @param onNotificationOpened - Called when user taps a push notification.
+ * @param onNotificationOpened — Called when user taps a push notification.
  *                               Use this to navigate to the relevant screen.
  */
 export function useFCM(
   onNotificationOpened?: NotificationHandler
 ) {
-  const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
   const handlerRef = useRef(onNotificationOpened);
   handlerRef.current = onNotificationOpened;
@@ -241,16 +231,16 @@ export function useFCM(
       setHasPermission(granted);
 
       if (!granted) {
-        console.log("[FCM] No permission, skipping setup");
+        console.log("[Notifications] No permission, skipping setup");
         return;
       }
 
       // 2. Get and sync token
-      const token = await getFcmToken();
+      const token = await getExpoPushToken();
       if (!mounted) return;
 
       if (token) {
-        setFcmToken(token);
+        setExpoPushToken(token);
         await syncTokenToSupabase(token);
       }
     })();
@@ -260,93 +250,33 @@ export function useFCM(
     };
   }, []);
 
-  // Handle foreground messages (show local notification)
+  // Handle notification tap while app is in background/quit
   useEffect(() => {
-    if (!hasPermission) return;
-
-    let unsubscribe: (() => void) | undefined;
-
-    void (async () => {
-      const mod = await getMessaging();
-      if (!mod) return;
-      const messaging = mod.default;
-      unsubscribe = messaging.onMessage(async (message: any) => {
-        const data = parseMessageData(message);
-        if (!data) return;
-        console.log("[FCM] Foreground message:", data.kind, data.title);
-      });
-    })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [hasPermission]);
-
-  // Handle notification that opened the app (from quit state)
-  useEffect(() => {
-    if (!hasPermission) return;
-
-    void (async () => {
-      const mod = await getMessaging();
-      if (!mod) return;
-      const messaging = mod.default;
-      const message = await messaging.getInitialNotification();
-      if (message) {
-        const data = parseMessageData(message);
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = parseNotificationData(response.notification);
         if (data && handlerRef.current) {
           handlerRef.current(data);
         }
       }
-    })();
-  }, [hasPermission]);
+    );
+    return () => subscription.remove();
+  }, []);
 
-  // Handle notification tap while app is in background
+  // Handle foreground notifications
   useEffect(() => {
-    if (!hasPermission) return;
-
-    let unsubscribe: (() => void) | undefined;
-
-    void (async () => {
-      const mod = await getMessaging();
-      if (!mod) return;
-      const messaging = mod.default;
-      unsubscribe = messaging.onNotificationOpenedApp((message: any) => {
-        const data = parseMessageData(message);
-        if (data && handlerRef.current) {
-          handlerRef.current(data);
-        }
-      });
-    })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [hasPermission]);
-
-  // Handle token refresh
-  useEffect(() => {
-    if (!hasPermission) return;
-
-    let unsubscribe: (() => void) | undefined;
-
-    void (async () => {
-      const mod = await getMessaging();
-      if (!mod) return;
-      const messaging = mod.default;
-      unsubscribe = messaging.onTokenRefresh(async (newToken: string) => {
-        console.log("[FCM] Token refreshed");
-        setFcmToken(newToken);
-        await syncTokenToSupabase(newToken);
-      });
-    })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [hasPermission]);
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const data = parseNotificationData(notification);
+        if (!data) return;
+        console.log("[Notifications] Foreground message:", data.kind, data.title);
+      }
+    );
+    return () => subscription.remove();
+  }, []);
 
   return {
-    fcmToken,
+    expoPushToken,
     hasPermission,
   };
 }
@@ -362,41 +292,40 @@ export function createNotificationChannels(): void {
   if (Platform.OS !== "android") return;
 
   try {
-    const channels = [
-      {
-        channelId: "sos_alerts",
-        channelName: "SOS Alerts",
-        importance: 4,
-        description: "Emergency SOS alerts from your circle",
-      },
-      {
-        channelId: "danger_alerts",
-        channelName: "Nearby Danger",
-        importance: 4,
-        description: "High-trust danger alerts near your location",
-      },
-      {
-        channelId: "verified_alerts",
-        channelName: "Verified Incidents",
-        importance: 3,
-        description: "Incidents that have reached verified status",
-      },
-      {
-        channelId: "circle",
-        channelName: "Circle Notifications",
-        importance: 2,
-        description: "Circle requests and updates",
-      },
-      {
-        channelId: "system",
-        channelName: "System Notifications",
-        importance: 1,
-        description: "System updates and info",
-      },
-    ];
+    Notifications.setNotificationChannelAsync("sos_alerts", {
+      name: "SOS Alerts",
+      importance: Notifications.AndroidImportance.MAX,
+      description: "Emergency SOS alerts from your circle",
+      lightColor: "#FF231F7C",
+      vibrationPattern: [0, 250, 250, 250],
+    });
 
-    console.log("[FCM] Android channels configured:", channels.length);
+    Notifications.setNotificationChannelAsync("danger_alerts", {
+      name: "Nearby Danger",
+      importance: Notifications.AndroidImportance.HIGH,
+      description: "High-trust danger alerts near your location",
+    });
+
+    Notifications.setNotificationChannelAsync("verified_alerts", {
+      name: "Verified Incidents",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      description: "Incidents that have reached verified status",
+    });
+
+    Notifications.setNotificationChannelAsync("circle", {
+      name: "Circle Notifications",
+      importance: Notifications.AndroidImportance.LOW,
+      description: "Circle requests and updates",
+    });
+
+    Notifications.setNotificationChannelAsync("system", {
+      name: "System Notifications",
+      importance: Notifications.AndroidImportance.MIN,
+      description: "System updates and info",
+    });
+
+    console.log("[Notifications] Android channels configured");
   } catch (error) {
-    console.error("[FCM] Failed to create channels:", error);
+    console.error("[Notifications] Failed to create channels:", error);
   }
 }

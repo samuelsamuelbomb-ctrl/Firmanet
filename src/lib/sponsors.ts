@@ -6,8 +6,9 @@ export interface Sponsor {
   tagline: string;
   tier: SponsorTier;
   initials: string;
-  accent: string; // tailwind bg utility for logo bubble
+  accent: string; // can be hex or tailwind utility for web
   url?: string;
+  image_url?: string | null; // Optional image URL for sponsor logo
 }
 
 export const TIER_META: Record<SponsorTier, { label: string; chip: string }> = {
@@ -25,6 +26,15 @@ export const TIER_META: Record<SponsorTier, { label: string; chip: string }> = {
   },
 };
 
+// Helper function to map hex colors to Tailwind utilities (simplified for the demo)
+export const hexToTailwindAccent = (hex: string): string => {
+  if (hex.includes("#FF8C42")) return "bg-warn/70 text-warn-foreground";
+  if (hex.includes("#6C63FF")) return "bg-primary text-primary-foreground";
+  if (hex.includes("#9B59B6")) return "bg-lavender text-lavender-foreground";
+  if (hex.includes("#E67E22")) return "bg-peach text-peach-foreground";
+  return "bg-primary text-primary-foreground";
+};
+
 export const sponsors: Sponsor[] = [
   {
     id: "mtn",
@@ -32,7 +42,8 @@ export const sponsors: Sponsor[] = [
     tagline: "Connecting Nigerians to safety in real time",
     tier: "infrastructure",
     initials: "MTN",
-    accent: "bg-warn/70 text-warn-foreground",
+    accent: "#FF8C42",
+    image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/MTN_Group_Logo.svg/200px-MTN_Group_Logo.svg.png",
   },
   {
     id: "gtb",
@@ -40,7 +51,7 @@ export const sponsors: Sponsor[] = [
     tagline: "Supporting safer communities across Nigeria",
     tier: "community",
     initials: "GTB",
-    accent: "bg-primary text-primary-foreground",
+    accent: "#6C63FF",
   },
   {
     id: "access",
@@ -48,7 +59,7 @@ export const sponsors: Sponsor[] = [
     tagline: "Committed to community safety and resilience",
     tier: "community",
     initials: "AB",
-    accent: "bg-lavender text-lavender-foreground",
+    accent: "#9B59B6",
   },
   {
     id: "shell",
@@ -56,6 +67,6 @@ export const sponsors: Sponsor[] = [
     tagline: "Investing in safer, more resilient communities",
     tier: "national",
     initials: "SH",
-    accent: "bg-peach text-peach-foreground",
+    accent: "#E67E22",
   },
 ];

@@ -1,86 +1,166 @@
-import { Camera, Check, Clock, Eye, MapPin, Users, ChevronRight } from "lucide-react";
-import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { ShieldAlert, MapPin, MoreVertical, X, ThumbsUp, Flag, Share2, ZoomIn } from "lucide-react";
 import { Signal } from "@/lib/swish-mock";
-import { TrustBar } from "./TrustBar";
+import { formatTimeAgo } from "@/lib/utils";
+import { useMediaViewer } from "./MediaViewer";
 import { signalStore } from "@/lib/swish-store";
 
-const TYPE_META: Record<
-  Signal["type"],
-  { label: string; dot: string; chip: string }
-> = {
-  observation: { label: "Observation", dot: "bg-mint", chip: "bg-mint/50 text-mint-foreground" },
-  update: { label: "Community Update", dot: "bg-warn", chip: "bg-warn/40 text-warn-foreground" },
-  incident: { label: "Incident Report", dot: "bg-peach", chip: "bg-peach/60 text-peach-foreground" },
-  verified: { label: "Verified Alert", dot: "bg-danger", chip: "bg-danger/15 text-danger" },
+interface CategoryColors {
+  bg: string;
+  text: string;
+}
+
+const categoryColors: Record<string, CategoryColors> = {
+  crime: { bg: "bg-red-500", text: "text-red-500" },
+  fire: { bg: "bg-red-700", text: "text-red-700" },
+  flood: { bg: "bg-blue-500", text: "text-blue-500" },
+  accident: { bg: "bg-orange-500", text: "text-orange-500" },
+  missing: { bg: "bg-purple-500", text: "text-purple-500" },
+  other: { bg: "bg-gray-500", text: "text-gray-500" },
 };
 
+function isVideoUrl(url: string): boolean {
+  const videoExtensions = [".mp4", ".webm", ".ogg", ".mov", ".avi", ".mkv"];
+  return videoExtensions.some((ext) => url.toLowerCase().endsWith(ext));
+}
+
 export function SignalCard({ signal }: { signal: Signal }) {
-  const meta = TYPE_META[signal.type];
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const verify = async () => {
-    if (verifying || verified) return;
-    setVerifying(true);
-    const res = await signalStore.verify(signal.id);
-    setVerifying(false);
-    if (res.ok) setVerified(true);
+  console.log("SignalCard received signal:", signal);
+  const { open } = useMediaViewer();
+  const colors = categoryColors[signal.category] || categoryColors.other;
+  const isVerified = signal.state === "verified";
+
+  const handleConfirm = () => {
+    signalStore.toggleConfirm(signal.id);
   };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: signal.title,
+        text: signal.description,
+      });
+    }
+  };
+
   return (
-    <article className="rounded-3xl bg-card p-4 shadow-soft">
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.chip}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-          {meta.label}
-        </span>
-        <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          {signal.minutesAgo} min
-        </span>
+    <article className="rounded-3xl bg-card shadow-soft overflow-hidden">
+      <div className="p-4 space-y-4">
+        {/* Top Row */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-3">
+            {/* Avatar */}
+            <div className={`${colors.bg} w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0`}>
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            {/* Meta Text */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`font-bold ${colors.text} text-sm`}>
+                  {signal.category.charAt(0).toUpperCase() + signal.category.slice(1)}
+                </span>
+                <span className="text-muted-foreground text-sm">·</span>
+                <span className="text-muted-foreground text-sm">{signal.trust}%</span>
+                <span className="text-muted-foreground text-sm">·</span>
+                <span className={isVerified ? "text-emerald-500 font-semibold text-sm" : "text-amber-500 font-semibold text-sm"}>
+                  {isVerified ? "Verified" : "Unverified"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground text-sm truncate">{signal.location}</span>
+                <span className="text-muted-foreground text-sm">·</span>
+                <span className="text-muted-foreground text-sm">{formatTimeAgo(signal.minutesAgo)}</span>
+              </div>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="p-1 text-muted-foreground hover:text-foreground">
+              <MoreVertical className="w-5 h-5" />
+            </button>
+            <button className="p-1 text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Caption */}
+        <div className="space-y-2">
+          <h3 className="font-bold text-[15px] leading-tight">{signal.title}</h3>
+          {signal.description && (
+            <p className="text-muted-foreground text-sm leading-relaxed">{signal.description}</p>
+          )}
+          <div className="text-muted-foreground text-xs">
+            {signal.distanceKm.toFixed(1)} km away · {signal.reports} report{signal.reports !== 1 ? "s" : ""}
+          </div>
+        </div>
       </div>
-      <h3 className="mt-3 font-display text-[17px] font-semibold leading-tight">
-        {signal.title}
-      </h3>
-      {signal.description && (
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{signal.description}</p>
+
+      {/* Media - edge to edge */}
+      {signal.media_urls && signal.media_urls.length > 0 && (
+        <div className="relative aspect-square">
+          {isVideoUrl(signal.media_urls[0]) ? (
+            <video
+              src={signal.media_urls[0]}
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+              loop
+            />
+          ) : (
+            <img
+              src={signal.media_urls[0]}
+              alt={signal.title}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={() => open(signal.media_urls![0])}
+            />
+          )}
+          {!isVideoUrl(signal.media_urls[0]) && (
+            <button
+              className="absolute bottom-2 right-2 bg-black/40 backdrop-blur-sm rounded-full p-1.5"
+              onClick={() => open(signal.media_urls![0])}
+            >
+              <ZoomIn className="w-4 h-4 text-white" />
+            </button>
+          )}
+        </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <MapPin className="h-3.5 w-3.5" /> {signal.location}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Eye className="h-3.5 w-3.5" /> {signal.distanceKm.toFixed(1)} km
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" /> {signal.reports}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Camera className="h-3.5 w-3.5" /> {signal.media}
-        </span>
-      </div>
-      <div className="mt-3">
-        <TrustBar value={signal.trust} />
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <Link
-          to="/incident/$id"
-          params={{ id: signal.id }}
-          className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-soft"
-        >
-          Open <ChevronRight className="h-3 w-3" />
-        </Link>
-        <button
-          onClick={verify}
-          disabled={verifying || verified}
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-            verified
-              ? "bg-mint/70 text-mint-foreground"
-              : "bg-muted text-foreground/80 hover:bg-muted/80"
-          }`}
-        >
-          <Check className="h-3 w-3" />
-          {verified ? "Verified" : verifying ? "Verifying…" : "Verify this"}
-        </button>
+
+      <div className="p-4 space-y-4">
+        {/* Count Line */}
+        <div className="flex items-center justify-between pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+              <ThumbsUp className="w-3 h-3 text-white" />
+            </div>
+            <span className="text-sm font-medium">{signal.confirms} confirmation{signal.confirms !== 1 ? "s" : ""}</span>
+          </div>
+          <span className="text-sm font-medium">{signal.reports} report{signal.reports !== 1 ? "s" : ""}</span>
+        </div>
+
+        {/* Action Row */}
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors ${
+              signal.userConfirmed ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+            onClick={handleConfirm}
+          >
+            <ThumbsUp className="w-4 h-4" />
+            Confirm
+          </button>
+          <button className="flex items-center justify-center gap-2 rounded-xl bg-muted py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/80 transition-colors">
+            <Flag className="w-4 h-4" />
+            Dispute
+          </button>
+          <button
+            className="flex items-center justify-center gap-2 rounded-xl bg-muted py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/80 transition-colors"
+            onClick={handleShare}
+          >
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+        </div>
       </div>
     </article>
   );

@@ -8,7 +8,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList,
-  TextInput, Modal, ActivityIndicator,
+  TextInput, Modal, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
@@ -219,7 +219,11 @@ function AddMemberModal({ me, onClose, onAdded }: { me: string | null; onClose: 
 
   return (
     <Modal transparent animationType="slide" visible>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
         <View style={styles.modal}>
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
@@ -247,8 +251,8 @@ function AddMemberModal({ me, onClose, onAdded }: { me: string | null; onClose: 
                 <View style={styles.userRow}>
                   <View style={styles.avatar}><Text style={styles.avatarText}>{(u.display_name ?? u.username).slice(0, 1).toUpperCase()}</Text></View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.memberName}>{u.display_name ?? u.username}</Text>
-                    <Text style={styles.requestUser}>@{u.username}</Text>
+                    <Text style={styles.userDisplayName}>{u.display_name ?? u.username}</Text>
+                    <Text style={styles.userUsername}>@{u.username}</Text>
                   </View>
                   <TouchableOpacity
                     style={[styles.requestBtn, already && styles.requestBtnSent]}
@@ -271,7 +275,7 @@ function AddMemberModal({ me, onClose, onAdded }: { me: string | null; onClose: 
             }
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -280,66 +284,69 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 },
   title: { fontSize: 22, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
   sub: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#2D6A4F", justifyContent: "center", alignItems: "center" },
-  list: { gap: 8, paddingBottom: 40 },
+  addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#2D6A4F", justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 4 },
+  list: { gap: 12, paddingBottom: 40 },
   sectionTitle: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, color: "#6B7280", marginBottom: 8 },
   requestsSection: { marginBottom: 16 },
   requestCard: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#FFFFFF", padding: 12, borderRadius: 16, marginBottom: 8,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    backgroundColor: "#FFFFFF", padding: 14, borderRadius: 20, marginBottom: 8,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   avatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: "#2D6A4F",
+    width: 48, height: 48, borderRadius: 24, backgroundColor: "#2D6A4F",
     justifyContent: "center", alignItems: "center",
   },
-  avatarText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  avatarText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
   requestInfo: { flex: 1 },
-  requestName: { fontSize: 13, fontWeight: "600", color: "#1A1A2E" },
+  requestName: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
   requestUser: { fontSize: 11, color: "#6B7280" },
-  declineBtn: { backgroundColor: "#E5E7EB", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  declineText: { fontSize: 11, fontWeight: "600", color: "#1A1A2E" },
-  acceptBtn: { backgroundColor: "#2D6A4F", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  acceptText: { fontSize: 11, fontWeight: "600", color: "#FFFFFF" },
+  declineBtn: { backgroundColor: "#F3F4F6", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
+  declineText: { fontSize: 12, fontWeight: "600", color: "#1A1A2E" },
+  acceptBtn: { backgroundColor: "#2D6A4F", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
+  acceptText: { fontSize: 12, fontWeight: "600", color: "#FFFFFF" },
   memberCard: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#FFFFFF", padding: 12, borderRadius: 16,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    backgroundColor: "#FFFFFF", padding: 14, borderRadius: 20,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   memberLeft: { position: "relative" },
-  statusDot: { position: "absolute", bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: "#FFFFFF" },
+  statusDot: { position: "absolute", bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: "#FFFFFF" },
   memberInfo: { flex: 1 },
   memberNameRow: { flexDirection: "row", alignItems: "center" },
-  memberName: { fontSize: 13, fontWeight: "600", color: "#1A1A2E" },
+  memberName: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
   memberRole: { fontSize: 11, color: "#6B7280" },
-  memberMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  memberMetaText: { fontSize: 10, color: "#6B7280" },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 10, fontWeight: "600" },
-  removeBtn: { padding: 6 },
-  emptyCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 32, alignItems: "center" },
-  emptyText: { fontSize: 13, color: "#6B7280", textAlign: "center" },
-  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.3)" },
+  memberMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  memberMetaText: { fontSize: 11, color: "#6B7280" },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
+  statusText: { fontSize: 11, fontWeight: "600" },
+  removeBtn: { padding: 8 },
+  emptyCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 32, alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  emptyText: { fontSize: 14, color: "#6B7280", textAlign: "center" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   modal: {
     backgroundColor: "#F7F8FB", borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    padding: 20, paddingBottom: 36, maxHeight: "80%",
+    padding: 20, paddingBottom: 36, maxHeight: "75%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 20,
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D1D5DB", alignSelf: "center", marginBottom: 12 },
+  modalHandle: { width: 48, height: 5, borderRadius: 2.5, backgroundColor: "#D1D5DB", alignSelf: "center", marginBottom: 16 },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
+  modalTitle: { fontSize: 20, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
   searchBar: {
-    flexDirection: "row", alignItems: "center", gap: 8,
+    flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#1A1A2E" },
-  errorBox: { backgroundColor: "rgba(230,57,70,0.1)", padding: 10, borderRadius: 12, marginBottom: 8 },
-  errorText: { fontSize: 11, color: "#E63946" },
-  userRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFFFFF", padding: 12, borderRadius: 12, marginBottom: 4 },
-  requestBtn: { backgroundColor: "#2D6A4F", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  searchInput: { flex: 1, fontSize: 15, color: "#1A1A2E" },
+  errorBox: { backgroundColor: "rgba(230,57,70,0.12)", padding: 12, borderRadius: 16, marginBottom: 12 },
+  errorText: { fontSize: 12, color: "#E63946", fontWeight: "500" },
+  userRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFFFFF", padding: 14, borderRadius: 16, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  userDisplayName: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
+  userUsername: { fontSize: 11, color: "#6B7280" },
+  requestBtn: { backgroundColor: "#2D6A4F", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
   requestBtnSent: { backgroundColor: "#D8F3DC" },
-  requestBtnText: { fontSize: 11, fontWeight: "600", color: "#FFFFFF" },
+  requestBtnText: { fontSize: 12, fontWeight: "600", color: "#FFFFFF" },
   requestBtnTextSent: { color: "#2D6A4F" },
-  noResults: { textAlign: "center", fontSize: 12, color: "#6B7280", paddingVertical: 24 },
-  hint: { textAlign: "center", fontSize: 12, color: "#9CA3AF", paddingVertical: 24 },
+  noResults: { textAlign: "center", fontSize: 13, color: "#6B7280", paddingVertical: 32 },
+  hint: { textAlign: "center", fontSize: 13, color: "#9CA3AF", paddingVertical: 32 },
 });

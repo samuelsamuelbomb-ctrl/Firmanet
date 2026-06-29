@@ -26,6 +26,7 @@ export type MainStackParamList = {
   Notifications: undefined;
   Profile: undefined;
   IncidentDetail: { id: string };
+  NearbyIncidents: undefined;
 };
 
 export type RootStackParamList = {

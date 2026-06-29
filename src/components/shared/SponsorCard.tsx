@@ -4,11 +4,35 @@
  * Ported from src/components/swish/SponsorCard.tsx
  */
 
-import { View, Text, StyleSheet } from "react-native";
-import { sponsors } from "../../core/sponsors";
+import { View, Text, StyleSheet, Image, Animated } from "react-native";
+import { useSponsors, useSponsorsBootstrap } from "../../core/sponsorStore";
+import { useEffect, useRef, useState } from "react";
 import type { Sponsor } from "../../core/types";
 
+export function SponsorCard({ sponsor }: { sponsor: Sponsor }) {
+  return (
+    <View style={styles.sponsorCard}>
+      {sponsor.image_url ? (
+        <Image
+          source={{ uri: sponsor.image_url }}
+          style={styles.sponsorLogo}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.sponsorLogo, { backgroundColor: sponsor.accent }]}>
+          <Text style={styles.sponsorInitials}>{sponsor.initials}</Text>
+        </View>
+      )}
+      <View>
+        <Text style={styles.sponsorName}>{sponsor.name}</Text>
+        <Text style={styles.sponsorTagline}>{sponsor.tagline}</Text>
+      </View>
+    </View>
+  );
+}
+
 export function SponsorSeparator() {
+  const sponsors = useSponsors();
   return (
     <View style={sepStyles.container}>
       <View style={sepStyles.line} />
@@ -22,16 +46,58 @@ export function SponsorSeparator() {
 }
 
 export function SponsorStrip() {
+  const sponsors = useSponsors();
+  const { bootstrap } = useSponsorsBootstrap();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    void bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (sponsors.length === 0) return;
+    
+    const interval = setInterval(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setCurrentIndex((prev) => (prev + 1) % sponsors.length);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [sponsors.length, fadeAnim]);
+
+  const currentSponsor = sponsors.length > 0 ? sponsors[currentIndex] : null;
+
   return (
     <View style={styles.strip}>
       <Text style={styles.label}>COMMUNITY SUPPORTERS</Text>
       <View style={styles.logos}>
-        {sponsors.slice(0, 3).map((s) => (
-          <View key={s.id} style={[styles.sponsorDot, { backgroundColor: s.accent }]}>
-            <Text style={styles.sponsorInitials}>{s.initials}</Text>
-          </View>
-        ))}
-        <Text style={styles.moreText}>+{Math.max(0, sponsors.length - 3)}</Text>
+        {currentSponsor ? (
+          <Animated.View style={{ opacity: fadeAnim, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {currentSponsor.image_url ? (
+              <Image
+                source={{ uri: currentSponsor.image_url }}
+                style={[styles.sponsorDot, { width: 32, height: 32, borderRadius: 10 }]}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.sponsorDot, { backgroundColor: currentSponsor.accent, width: 32, height: 32, borderRadius: 10 }]}>
+                <Text style={[styles.sponsorInitials, { fontSize: 10 }]}>{currentSponsor.initials}</Text>
+              </View>
+            )}
+            <Text style={[styles.moreText, { fontWeight: "600", color: "#374151" }]}>{currentSponsor.name}</Text>
+          </Animated.View>
+        ) : null}
       </View>
     </View>
   );
@@ -79,6 +145,27 @@ const styles = StyleSheet.create({
   moreText: {
     fontSize: 10,
     fontWeight: "600",
+    color: "#6B7280",
+  },
+  sponsorCard: {
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 8,
+  },
+  sponsorLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sponsorName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1A1A2E",
+  },
+  sponsorTagline: {
+    fontSize: 11,
     color: "#6B7280",
   },
 });

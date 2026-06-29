@@ -9,6 +9,7 @@ import { useNavigation } from "@react-navigation/native";
 import { MapPin, Clock, Users } from "lucide-react-native";
 import type { SignalCluster } from "../../core/types";
 import { lightTap } from "../../core/haptics";
+import { formatTimeAgo } from "../../core/utils";
 
 interface ClusterCardProps {
   cluster: SignalCluster;
@@ -17,10 +18,20 @@ interface ClusterCardProps {
 export function ClusterCard({ cluster }: ClusterCardProps) {
   const navigation = useNavigation<any>();
 
+  const openIncident = () => {
+    lightTap();
+    // IncidentDetail is in MainStack
+    try {
+      navigation.navigate("MainStack", { screen: "IncidentDetail", params: { id: cluster.primary.id } });
+    } catch {
+      navigation.navigate("IncidentDetail", { id: cluster.primary.id });
+    }
+  };
+
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => { lightTap(); navigation.navigate("IncidentDetail", { id: cluster.primary.id }); }}
+      onPress={openIncident}
       activeOpacity={0.7}
     >
       <View style={styles.header}>
@@ -35,7 +46,7 @@ export function ClusterCard({ cluster }: ClusterCardProps) {
         </View>
         <View style={styles.metaItem}>
           <Clock size={12} color="#6B7280" />
-          <Text style={styles.metaText}>{cluster.minutesAgo}m ago</Text>
+          <Text style={styles.metaText}>{formatTimeAgo(cluster.minutesAgo)}</Text>
         </View>
         <View style={styles.metaItem}>
           <Users size={12} color="#6B7280" />

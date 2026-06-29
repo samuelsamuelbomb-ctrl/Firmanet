@@ -20,6 +20,9 @@ export interface Signal {
   description?: string;
   lat: number;
   lng: number;
+  media_urls?: string[];
+  confirms: number;
+  userConfirmed: boolean;
 }
 
 export function trustToIntensity(score: number): Intensity {

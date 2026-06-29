@@ -18,13 +18,30 @@ interface SectionHeaderProps {
 export function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
   const navigation = useNavigation<any>();
 
+  const handleAction = () => {
+    lightTap();
+    if (onAction) {
+      // Tab routes (e.g. FeedTab, MapTab) are directly accessible in tab navigator
+      // Stack routes need parent navigation
+      if (onAction === "Notifications" || onAction === "Profile" || onAction === "IncidentDetail") {
+        try {
+          navigation.navigate("MainStack", { screen: onAction });
+        } catch {
+          navigation.navigate(onAction);
+        }
+      } else {
+        navigation.navigate(onAction);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       {action && onAction && (
         <TouchableOpacity
           style={styles.action}
-          onPress={() => { lightTap(); navigation.navigate(onAction); }}
+          onPress={handleAction}
           activeOpacity={0.7}
         >
           <Text style={styles.actionText}>{action}</Text>

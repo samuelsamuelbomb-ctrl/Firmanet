@@ -4,8 +4,9 @@ import { Siren, MapPin, Users, Radio, X, Check, Lock } from "lucide-react";
 import { play, stopSos } from "@/lib/swish-sound";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserLocation } from "@/hooks/useUserLocation";
-import { SOS_CIRCLE_SIZE } from "@/core/constants";
-import { lightTap, heavyTap, successNotify } from "@/core/haptics";
+import { SOS_CIRCLE_SIZE } from "@/lib/constants";
+import { lightTap, heavyTap, successNotify } from "@/lib/haptics";
+import { signalStore } from "@/lib/swish-store";
 
 export const Route = createFileRoute("/sos")({
   head: () => ({
@@ -76,20 +77,34 @@ function SosPage() {
       void (async () => {
         const { data: auth } = await supabase.auth.getUser();
         if (!auth.user) return;
+        // 1. Insert into sos_sessions
         const { data } = await supabase
           .from("sos_sessions")
           .insert({
             user_id: auth.user.id,
             status: "active",
             location: gpsLocation?.locationName ?? "Current Location",
+            lat: gpsLocation?.lat,
+            lng: gpsLocation?.lng
           })
           .select()
           .single();
         if (data) setSessionId(data.id as string);
+
+        // 2. Add signal to map using signalStore
+        signalStore.add({
+          type: "incident",
+          category: "sos",
+          title: "Emergency SOS Alert",
+          description: "A user has activated an emergency SOS signal nearby.",
+          location: gpsLocation?.locationName ?? "Current Location",
+          lat: gpsLocation?.lat,
+          lng: gpsLocation?.lng
+        });
       })();
     }
     return () => {};
-  }, [stage]);
+  }, [stage, gpsLocation]);
 
   useEffect(() => () => stopSos(), []);
 

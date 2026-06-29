@@ -6,6 +6,12 @@ import { useSignals, useSignalsRealtime, signalStore } from "@/lib/swish-store";
 import { trustToIntensity } from "@/lib/swish-mock";
 import { ArrowLeft, MapPin, Clock, Users, ShieldCheck, CheckCircle2, AlertTriangle, Camera } from "lucide-react";
 import { useState } from "react";
+import { formatTimeAgo } from "@/lib/utils";
+
+function isVideoUrl(url: string): boolean {
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+  return videoExtensions.some(ext => url.toLowerCase().endsWith(ext));
+}
 
 export const Route = createFileRoute("/incident/$id")({
   head: () => ({
@@ -63,26 +69,26 @@ function IncidentPage() {
   return (
     <AppShell>
       <TopBar />
-      <div className="px-4 pb-6">
+      <div className="px-4 pb-6 pt-4">
         <button onClick={() => navigate({ to: "/feed" })} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between">
           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${state.tone}`}>
             {state.label}
           </span>
           <span className="text-[11px] text-muted-foreground capitalize">{signal.type}</span>
         </div>
 
-        <h1 className="mt-2 font-display text-2xl font-bold leading-tight">{signal.title}</h1>
+        <h1 className="mt-4 font-display text-2xl font-bold leading-tight">{signal.title}</h1>
         {signal.description && (
-          <p className="mt-2 text-sm text-muted-foreground">{signal.description}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{signal.description}</p>
         )}
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Stat icon={<MapPin className="h-4 w-4" />} label="Distance" value={`${signal.distanceKm.toFixed(1)} km`} />
-          <Stat icon={<Clock className="h-4 w-4" />} label="Reported" value={`${signal.minutesAgo}m ago`} />
+          <Stat icon={<Clock className="h-4 w-4" />} label="Reported" value={formatTimeAgo(signal.minutesAgo)} />
           <Stat icon={<Users className="h-4 w-4" />} label="Reports" value={String(signal.reports)} />
         </div>
 
@@ -110,7 +116,31 @@ function IncidentPage() {
             <Camera className="h-4 w-4 text-muted-foreground" />
             <h3 className="font-display text-sm font-semibold">Media</h3>
           </div>
-          {signal.media > 0 ? (
+          {signal.media_urls && signal.media_urls.length > 0 ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {signal.media_urls.map((url, index) => (
+                isVideoUrl(url) ? (
+                  <video
+                    key={index}
+                    src={url}
+                    className="w-full h-32 object-cover rounded-xl"
+                    controls
+                    playsInline
+                  />
+                ) : (
+                  <img 
+                    key={index} 
+                    src={url} 
+                    alt={`Attachment ${index + 1}`} 
+                    className="w-full h-32 object-cover rounded-xl"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )
+              ))}
+            </div>
+          ) : signal.media > 0 ? (
             <p className="mt-1 text-xs text-muted-foreground">{signal.media} photo/video attachments.</p>
           ) : (
             <p className="mt-1 text-xs text-muted-foreground">No media attached yet.</p>
@@ -120,7 +150,7 @@ function IncidentPage() {
         <div className="mt-4 rounded-3xl bg-card p-4 shadow-soft">
           <h3 className="font-display text-sm font-semibold">Timeline</h3>
           <ol className="mt-3 space-y-3">
-            <TimelineItem icon={<AlertTriangle className="h-3.5 w-3.5" />} text="Initial report submitted" time={`${signal.minutesAgo}m ago`} />
+            <TimelineItem icon={<AlertTriangle className="h-3.5 w-3.5" />} text="Initial report submitted" time={formatTimeAgo(signal.minutesAgo)} />
             {signal.reports >= 3 && (
               <TimelineItem icon={<Users className="h-3.5 w-3.5" />} text={`${signal.reports - 1} corroborating reports`} time="now" />
             )}

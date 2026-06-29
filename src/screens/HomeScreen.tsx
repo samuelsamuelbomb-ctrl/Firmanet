@@ -8,10 +8,14 @@
  *   - Tailwind classes → StyleSheet
  *   - `useSignals` / `useSignalsRealtime` imported from core
  *   - `play` sound adapted via `expo-av` through the SoundEngine interface
+ *
+ * FIXED: StatusCard now computes intensity from REAL signal data (via Supabase)
+ *        instead of using a local toggle. Matches the web version behavior.
+ * FIXED: Signals are filtered by user's radius and alert intensity settings.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
 import { StatusCard } from "../components/shared/StatusCard";
@@ -20,31 +24,34 @@ import { SignalCard } from "../components/shared/SignalCard";
 import { SectionHeader } from "../components/shared/SectionHeader";
 import { SponsorStrip } from "../components/shared/SponsorCard";
 import { useSignals, useSignalsRealtime } from "../core/signalStore";
-import type { Intensity } from "../core/types";
+import { useIntensity, useRadius, intensityToMinTrust } from "../core/settingsStore";
+import type { Signal, Intensity } from "../core/types";
 import { mediumTap } from "../core/haptics";
 
-const INTENSITY_CYCLE: Intensity[] = ["calm", "warn", "danger"];
+/** Compute overall intensity from real signal data — matches web's swish/StatusCard.tsx */
+function computeIntensity(signals: Signal[]): Intensity {
+  for (const s of signals) {
+    if (s.trust >= 80) return "danger";
+    if (s.trust >= 60) return "warn";
+  }
+  return "calm";
+}
 
 export default function HomeScreen() {
-  const [intensity, setIntensity] = useState<Intensity>("calm");
+  const navigation = useNavigation<any>();
   const signals = useSignals();
+  const alertIntensity = useIntensity();
+  const maxRadius = useRadius();
+
   useSignalsRealtime();
-  const first = useRef(true);
 
-  const cycle = () => {
-    mediumTap();
-    setIntensity((cur) => INTENSITY_CYCLE[(INTENSITY_CYCLE.indexOf(cur) + 1) % 3]);
-  };
+  // Filter signals by radius and alert intensity threshold
+  const minTrust = intensityToMinTrust(alertIntensity);
+  const filteredSignals = signals.filter(
+    (s) => s.distanceKm <= maxRadius && s.trust >= minTrust,
+  );
 
-  // Sound effect on intensity change (skip first render)
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    // Play sound via sound engine
-    // play(intensity);
-  }, [intensity]);
+  const intensity = computeIntensity(filteredSignals);
 
   return (
     <AppShell>
@@ -54,14 +61,20 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <StatusCard intensity={intensity} onCycle={cycle} />
+        <StatusCard intensity={intensity} signals={filteredSignals} onPress={() => { mediumTap(); navigation.navigate("MainStack", { screen: "NearbyIncidents" }); }} />
         <QuickActions />
         <View style={styles.section}>
           <SectionHeader title="Latest near you" action="See all" onAction="FeedTab" />
           <View style={styles.signalList}>
-            {signals.slice(0, 3).map((s) => (
-              <SignalCard key={s.id} signal={s} />
-            ))}
+            {filteredSignals.length > 0 ? (
+              filteredSignals.slice(0, 3).map((s) => (
+                <SignalCard key={s.id} signal={s} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>
+                No signals within your radius. Adjust settings to see more.
+              </Text>
+            )}
           </View>
         </View>
         <SponsorStrip />
@@ -83,5 +96,12 @@ const styles = StyleSheet.create({
   },
   signalList: {
     gap: 12,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#6B7280",
+    textAlign: "center",
+    paddingVertical: 20,
+    fontStyle: "italic",
   },
 });

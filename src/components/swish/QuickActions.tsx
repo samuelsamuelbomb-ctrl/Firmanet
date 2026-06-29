@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Plus, Map, Siren, Users } from "lucide-react";
-import { lightTap } from "@/core/haptics";
+import { lightTap } from "@/lib/haptics";
 
 const actions = [
   { label: "Report", icon: Plus, to: "/feed", tone: "bg-mint text-mint-foreground" },

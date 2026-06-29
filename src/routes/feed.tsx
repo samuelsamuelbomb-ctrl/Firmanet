@@ -46,24 +46,19 @@ function FeedPage() {
   return (
     <AppShell>
       <TopBar />
-      <div className="px-4">
-        <h1 className="font-display text-2xl font-semibold">Signals</h1>
-        <p className="text-sm text-muted-foreground">Verified intelligence from your community.</p>
-
-        <div className="mt-4 overflow-x-auto">
-          <div className="inline-flex gap-1 rounded-full bg-muted p-1">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                  tab === t ? "bg-surface text-foreground shadow-soft" : "text-muted-foreground"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+      <div className="px-4 pt-2">
+        <div className="mt-2 inline-flex w-full overflow-hidden rounded-[10px] bg-muted p-0.5">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 whitespace-nowrap rounded-[8px] px-3 py-1.5 text-center text-xs font-semibold leading-none transition-all ${
+                tab === t ? "bg-surface text-foreground shadow-soft" : "text-muted-foreground/70 hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
 
         <div className="mt-4 space-y-3">

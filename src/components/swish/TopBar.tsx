@@ -2,18 +2,18 @@ import { Link } from "@tanstack/react-router";
 import { Bell, MapPin, User } from "lucide-react";
 import { Logo } from "./Logo";
 import { useUserLocation } from "@/hooks/useUserLocation";
-import { lightTap } from "@/core/haptics";
+import { lightTap } from "@/lib/haptics";
 
 export function TopBar() {
   const { location } = useUserLocation();
   const display = location ? location.locationName : "Getting location…";
   return (
     <div className="flex items-center justify-between px-5 pt-6 pb-3">
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden">
         <Logo size={28} />
-        <button className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1.5 text-xs font-medium shadow-soft">
-          <MapPin className="h-3.5 w-3.5 text-mint-foreground" />
-          <span>{display}</span>
+        <button className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden rounded-full bg-surface px-2.5 py-1.5 text-xs font-medium shadow-soft">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-mint-foreground" />
+          <span className="max-w-[120px] truncate">{display}</span>
         </button>
       </div>
       <div className="flex items-center gap-2">

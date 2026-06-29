@@ -1,8 +1,7 @@
 /**
- * BottomTabBar — Custom glass-morphism tab bar.
+ * BottomTabBar — TikTok-style dark bottom navigation bar.
  *
- * Ported from src/components/swish/BottomNav.tsx
- * 5 tabs: Home, Feed, Map, Circle, Settings
+ * A slim dark strip at the bottom of the screen with white icons.
  */
 
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
@@ -23,10 +22,9 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: insets.bottom + 12 }]}>
+    <View style={[styles.wrapper, { paddingBottom: insets.bottom || 8 }]}>
       <View style={styles.container}>
         {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
           const isFocused = state.index === index;
           const tab = TABS[index];
           const Icon = tab.icon;
@@ -53,13 +51,11 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               accessibilityRole="tab"
               accessibilityState={{ selected: isFocused }}
             >
-              <View style={[styles.iconContainer, isFocused && styles.activeIcon]}>
-                <Icon
-                  size={18}
-                  strokeWidth={2.25}
-                  color={isFocused ? "#2D6A4F" : "#8E8E93"}
-                />
-              </View>
+              <Icon
+                size={24}
+                strokeWidth={isFocused ? 2.8 : 2.25}
+                color={isFocused ? "#FFFFFF" : "rgba(255,255,255,0.5)"}
+              />
               <Text style={[styles.label, isFocused && styles.activeLabel]}>
                 {tab.label}
               </Text>
@@ -78,46 +74,28 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 40,
+    backgroundColor: "rgba(18,18,18,0.95)",
   },
   container: {
     flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.06)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    alignItems: "flex-end",
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   tab: {
     flex: 1,
     alignItems: "center",
-    gap: 2,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
     justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 16,
-  },
-  activeIcon: {
-    backgroundColor: "#D8F3DC",
+    gap: 2,
+    paddingVertical: 4,
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "500",
-    color: "#8E8E93",
+    color: "rgba(255,255,255,0.5)",
   },
   activeLabel: {
-    color: "#2D6A4F",
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

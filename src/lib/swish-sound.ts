@@ -10,11 +10,42 @@
  *   sos    → siren sweep (A4 ↔ E5 repeating)
  */
 
+import { useSettingsStore } from "@/lib/settingsStore";
+import { isQuietHoursNow, intensityToSoundLevel } from "@/lib/settingsStore";
+
 export type SoundLevel = "calm" | "warn" | "danger" | "sos";
 
 let ctx: AudioContext | null = null;
 let muted = false;
 let sosTimer: ReturnType<typeof setInterval> | null = null;
+
+function shouldSuppressSound(): boolean {
+  try {
+    const state = useSettingsStore.getState();
+    if (state.loaded && state.quietHours) {
+      return isQuietHoursNow();
+    }
+  } catch (e) {
+    console.log("[Sound] store not ready", e);
+  }
+  return false;
+}
+
+function getIntensityGainMultiplier(): number {
+  try {
+    const state = useSettingsStore.getState();
+    if (state.loaded) {
+      switch (state.intensity) {
+        case "minimal": return 0.4; // only very loud sounds, and quieter
+        case "balanced": return 0.8; // normal volume
+        case "full": return 1.0; // loudest volume
+      }
+    }
+  } catch (e) {
+    console.log("[Sound] store not ready", e);
+  }
+  return 1.0;
+}
 
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -41,15 +72,18 @@ function tone(
   opts: { type?: OscillatorType; gain?: number; delay?: number } = {},
 ) {
   const c = getCtx();
-  if (!c || muted) return;
+  if (!c || muted || shouldSuppressSound()) return;
   const { type = "sine", gain = 0.12, delay = 0 } = opts;
+  const intensityMultiplier = getIntensityGainMultiplier();
+  const scaledGain = gain * intensityMultiplier;
+
   const t0 = c.currentTime + delay;
   const osc = c.createOscillator();
   const g = c.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, t0);
   g.gain.setValueAtTime(0, t0);
-  g.gain.linearRampToValueAtTime(gain, t0 + 0.02);
+  g.gain.linearRampToValueAtTime(scaledGain, t0 + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
   osc.connect(g).connect(c.destination);
   osc.start(t0);
@@ -57,7 +91,7 @@ function tone(
 }
 
 export function play(level: SoundLevel) {
-  if (muted) return;
+  if (muted || shouldSuppressSound()) return;
   stopSos();
   switch (level) {
     case "calm":

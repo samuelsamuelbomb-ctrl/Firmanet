@@ -4,7 +4,6 @@
     "slug": "firmanet",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/firmanet-logo.jpeg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -31,11 +30,21 @@
         "ACCESS_BACKGROUND_LOCATION"
       ]
     },
-    "plugins": [],
+    "plugins": [
+      "expo-secure-store",
+      "expo-location",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/firmanet-logo.png",
+          "color": "#E63E2B",
+          "sounds": []
+        }
+      ]
+    ],
     "extra": {
-      "eas": {
-        "projectId": "firmanet"
-      }
+      "EXPO_PUBLIC_SUPABASE_URL": "https://wnsklzhnuztxlzdhbnde.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_oAPrK_DtyG5G7xPXHF3T0A_mUEn0AH0"
     }
   }
 }

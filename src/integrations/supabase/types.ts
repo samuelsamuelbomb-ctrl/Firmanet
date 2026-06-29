@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      sponsors: {
+        Row: {
+          id: string
+          name: string
+          tagline: string
+          tier: "infrastructure" | "community" | "national"
+          initials: string
+          accent: string
+          image_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          tagline: string
+          tier: "infrastructure" | "community" | "national"
+          initials: string
+          accent: string
+          image_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          tagline?: string
+          tier?: "infrastructure" | "community" | "national"
+          initials?: string
+          accent?: string
+          image_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       circle_members: {
         Row: {
           created_at: string
@@ -237,6 +273,8 @@ export type Database = {
           acknowledged_count: number
           ended_at: string | null
           id: string
+          lat: number | null
+          lng: number | null
           location: string | null
           started_at: string
           status: Database["public"]["Enums"]["sos_status"]
@@ -246,6 +284,8 @@ export type Database = {
           acknowledged_count?: number
           ended_at?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["sos_status"]
@@ -255,12 +295,49 @@ export type Database = {
           acknowledged_count?: number
           ended_at?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["sos_status"]
           user_id?: string
         }
         Relationships: []
+      }
+      device_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          token: string
+          platform: "ios" | "android"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          token: string
+          platform: "ios" | "android"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          token?: string
+          platform?: "ios" | "android"
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {
@@ -417,6 +494,7 @@ export const Constants = {
       member_status: ["calm", "warn", "danger"],
       signal_type: ["observation", "update", "incident", "verified"],
       sos_status: ["active", "resolved", "cancelled"],
+      sponsor_tier: ["infrastructure", "community", "national"],
     },
   },
 } as const

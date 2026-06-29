@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Newspaper, Map, Users, Settings } from "lucide-react";
-import { lightTap } from "@/core/haptics";
+import { lightTap } from "@/lib/haptics";
 
 const TABS = [
   { icon: Home, label: "Home", to: "/" },

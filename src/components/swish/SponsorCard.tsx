@@ -1,16 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { Sponsor, TIER_META, sponsors } from "@/lib/sponsors";
+import { Sponsor, TIER_META, hexToTailwindAccent } from "@/lib/sponsors";
+import { useSponsors, useSponsorsBootstrap } from "@/lib/sponsorStore";
+import { useEffect, useState } from "react";
 
 /** Full-width institutional support card — onboarding + supporters page. */
 export function SponsorCard({ sponsor }: { sponsor: Sponsor }) {
   const tier = TIER_META[sponsor.tier];
+  const tailwindAccent = hexToTailwindAccent(sponsor.accent);
   return (
     <article className="flex items-center gap-3 rounded-3xl bg-card p-4 shadow-soft">
-      <div
-        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${sponsor.accent}`}
-      >
-        {sponsor.initials}
-      </div>
+      {sponsor.image_url ? (
+        <img
+          src={sponsor.image_url}
+          alt={`${sponsor.name} logo`}
+          className="h-14 w-14 shrink-0 rounded-2xl object-cover"
+        />
+      ) : (
+        <div
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${tailwindAccent}`}
+        >
+          {sponsor.initials}
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <h3 className="font-display text-base font-semibold leading-tight">
           {sponsor.name}
@@ -28,16 +39,65 @@ export function SponsorCard({ sponsor }: { sponsor: Sponsor }) {
   );
 }
 
-/** Compact footer strip — home + about. */
+/** Compact footer strip — home + about, with smooth transitions and swapping icons. */
 export function SponsorStrip() {
+  const sponsors = useSponsors();
+  const { bootstrap } = useSponsorsBootstrap();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  useEffect(() => {
+    void bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (sponsors.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % sponsors.length);
+        setIsTransitioning(false);
+      }, 300); // Wait for fade out before changing
+    }, 3000); // Swap every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [sponsors.length]);
+
+  const currentSponsor = sponsors.length > 0 ? sponsors[currentIndex] : null;
+  const tailwindAccent = currentSponsor ? hexToTailwindAccent(currentSponsor.accent) : "";
+
   return (
     <Link
       to="/settings"
       hash="supporters"
-      className="block rounded-2xl bg-muted/40 px-4 py-3 text-center text-[11px] text-muted-foreground"
+      className="block rounded-2xl bg-muted/40 px-4 py-3 text-[11px] text-muted-foreground overflow-hidden"
     >
-      <span className="font-semibold text-foreground/70">Supported by</span>{" "}
-      {sponsors.slice(0, 3).map((s) => s.name.split(" ")[0]).join(" · ")}
+      <div className="flex items-center justify-center gap-3">
+        <span className="font-semibold text-foreground/70 shrink-0">Supported by</span>
+        {currentSponsor && (
+          <div
+            className={`flex items-center gap-2 transition-opacity duration-300 ${
+              isTransitioning ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            {currentSponsor.image_url ? (
+              <img
+                src={currentSponsor.image_url}
+                alt={`${currentSponsor.name} logo`}
+                className="h-8 w-8 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[10px] font-bold ${tailwindAccent}`}
+              >
+                {currentSponsor.initials}
+              </div>
+            )}
+            <span className="font-semibold text-foreground/80">{currentSponsor.name}</span>
+          </div>
+        )}
+      </div>
     </Link>
   );
 }
@@ -46,11 +106,19 @@ export function SponsorStrip() {
 export function SponsorSeparator({ sponsor }: { sponsor: Sponsor }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border bg-surface/60 px-4 py-3">
-      <span
-        className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ${sponsor.accent}`}
-      >
-        {sponsor.initials}
-      </span>
+      {sponsor.image_url ? (
+        <img
+          src={sponsor.image_url}
+          alt={`${sponsor.name} logo`}
+          className="h-9 w-9 shrink-0 rounded-xl object-cover"
+        />
+      ) : (
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ${sponsor.accent}`}
+        >
+          {sponsor.initials}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Safety Partner

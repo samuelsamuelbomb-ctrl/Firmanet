@@ -6,7 +6,6 @@ import { TrustBar } from "@/components/swish/TrustBar";
 import { Locate, Layers, ShieldCheck } from "lucide-react";
 import { useSignals, useSignalsRealtime } from "@/lib/swish-store";
 import { Signal, SignalCategory } from "@/lib/swish-mock";
-import { getMapboxToken } from "@/lib/mapbox.functions";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -40,6 +39,16 @@ const CATEGORY_COLOR: Record<SignalCategory, string> = {
   other:    "oklch(0.65 0.02 270)",
 };
 
+/** Read the Mapbox public token directly from client‑side env vars.
+ *  The public token is safe to embed — no server round‑trip needed. */
+function getMapboxToken(): { token: string } {
+  const token =
+    import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN ??
+    import.meta.env.PUBLIC_MAPBOX_TOKEN ??
+    "";
+  return { token };
+}
+
 function MapPage() {
   useSignalsRealtime();
   const navigate = useNavigate();
@@ -49,8 +58,6 @@ function MapPage() {
   ]);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [tokenError, setTokenError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -58,17 +65,12 @@ function MapPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await getMapboxToken();
-        if (!res.token) setTokenError("Mapbox token not configured.");
-        else setToken(res.token);
-      } catch (e) {
-        setTokenError(e instanceof Error ? e.message : "Failed to load map token");
-      }
-    })();
-  }, []);
+  // Read token synchronously — no loading state needed
+  const { token, error: tokenError } = (() => {
+    const res = getMapboxToken();
+    if (!res.token) return { token: null, error: "Mapbox token not configured. Set VITE_MAPBOX_PUBLIC_TOKEN in .env" };
+    return { token: res.token, error: null };
+  })();
 
   // Init map once token is ready
   useEffect(() => {
@@ -85,14 +87,14 @@ function MapPage() {
       touchZoomRotate: true,
       doubleClickZoom: true,
     });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     const geo = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
       showUserHeading: true,
       fitBoundsOptions: { maxZoom: 14 },
     });
-    map.addControl(geo, "top-right");
+    map.addControl(geo, "bottom-right");
     geolocateRef.current = geo;
     map.on("load", () => {
       map.resize();
@@ -260,15 +262,6 @@ function MapPage() {
             </div>
           </div>
         </div>
-
-        {/* Recenter / locate me */}
-        <button
-          onClick={() => geolocateRef.current?.trigger()}
-          className="absolute bottom-28 right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground shadow-pop active:scale-95"
-          aria-label="Center on my location"
-        >
-          <Locate className="h-5 w-5" />
-        </button>
 
         {/* Coord pill + error banner */}
         {coords && (

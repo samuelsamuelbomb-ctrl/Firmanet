@@ -7,12 +7,14 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, TextInput } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Siren, MapPin, Users, Radio, X, Check, Lock } from "lucide-react-native";
 import { supabase } from "../core/supabase";
 import { SOS_CIRCLE_SIZE } from "../core/constants";
 import { lightTap, mediumTap, heavyTap, successNotify, errorNotify } from "../core/haptics";
+import { useSignalStore } from "../core/signalStore";
 
 type Stage = "ready" | "holding" | "armed" | "active";
 
@@ -39,33 +41,32 @@ export default function SOSScreen() {
     })();
   }, []);
 
-  // Get user's real location on mount
+  // Get user's real location on mount via expo-location
   useEffect(() => {
-    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setUserCoords({ lat, lng });
-          // Reverse geocode via Mapbox if token is available
-          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
-          if (token) {
-            fetch(
+    void (async () => {
+      try {
+        const { getCurrentPositionAsync, requestForegroundPermissionsAsync } = await import("expo-location");
+        const { status } = await requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const pos = await getCurrentPositionAsync({});
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserCoords({ lat, lng });
+        // Reverse geocode via Mapbox if token is available
+        const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+        if (token) {
+          try {
+            const res = await fetch(
               `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
-            )
-              .then((r) => r.json())
-              .then((data) => {
-                if (data?.features?.[0]?.place_name) {
-                  setUserLocationName(data.features[0].place_name);
-                }
-              })
-              .catch(() => {});
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10_000 },
-      );
-    }
+            );
+            const data = await res.json();
+            if (data?.features?.[0]?.place_name) {
+              setUserLocationName(data.features[0].place_name);
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
   }, []);
 
   // Hold progress timer
@@ -99,20 +100,39 @@ export default function SOSScreen() {
       void (async () => {
         const { data: auth } = await supabase.auth.getUser();
         if (!auth.user) return;
-        const { data } = await supabase
+        // 1. Insert into sos_sessions
+        const { data } = await (supabase as any)
           .from("sos_sessions")
-          .insert({ user_id: auth.user.id, status: "active", location: userLocationName })
+          .insert({ 
+            user_id: auth.user.id, 
+            status: "active", 
+            location: userLocationName,
+            lat: userCoords?.lat,
+            lng: userCoords?.lng 
+          })
           .select()
           .single();
-        if (data) setSessionId(data.id as string);
+        if (data) setSessionId((data as any).id as string);
+
+        // 2. Add signal to map using signalStore
+        const addAndPersist = useSignalStore.getState().addAndPersist;
+        await addAndPersist({
+          type: "incident",
+          category: "sos",
+          title: "Emergency SOS Alert",
+          description: "A user has activated an emergency SOS signal nearby.",
+          location: userLocationName,
+          lat: userCoords?.lat,
+          lng: userCoords?.lng
+        });
       })();
     }
-  }, [stage]);
+  }, [stage, userCoords, userLocationName]);
 
   // Sync acknowledged count to server
   useEffect(() => {
     if (!sessionId) return;
-    void supabase.from("sos_sessions").update({ acknowledged_count: Math.min(realAcks, SOS_CIRCLE_SIZE) }).eq("id", sessionId);
+    void (supabase as any).from("sos_sessions").update({ acknowledged_count: Math.min(realAcks, SOS_CIRCLE_SIZE) }).eq("id", sessionId);
   }, [realAcks, sessionId]);
 
   const startHold = () => { setHold(0); setStage("holding"); heavyTap(); };
@@ -121,7 +141,7 @@ export default function SOSScreen() {
 
   const confirmDeactivate = () => {
     if (sessionId) {
-      void supabase.from("sos_sessions").update({ status: "resolved", ended_at: new Date().toISOString() }).eq("id", sessionId);
+      void (supabase as any).from("sos_sessions").update({ status: "resolved", ended_at: new Date().toISOString() }).eq("id", sessionId);
     }
     heavyTap();
     navigation.goBack();
@@ -325,7 +345,7 @@ const rowStyles = StyleSheet.create({
 });
 
 const modalStyles = StyleSheet.create({
-  overlay: { position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end", zIndex: 80 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end", zIndex: 80 },
   modal: { backgroundColor: "#F7F8FB", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 },
   handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D1D5DB", alignSelf: "center", marginBottom: 16 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },

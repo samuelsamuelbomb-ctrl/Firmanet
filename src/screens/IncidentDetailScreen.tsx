@@ -4,8 +4,8 @@
  * Ported from /routes/incident.$id.tsx
  */
 
-import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
@@ -14,6 +14,66 @@ import { useSignals, useSignalsRealtime, signalStore } from "../core/signalStore
 import { trustToIntensity } from "../core/types";
 import { ArrowLeft, MapPin, Clock, Users, ShieldCheck, AlertTriangle, CheckCircle2, Camera } from "lucide-react-native";
 import { lightTap, mediumTap, successNotify } from "../core/haptics";
+import { supabase, SUPABASE_URL } from "../core/supabase";
+import { Video } from "expo-av";
+import { formatTimeAgo } from "../core/utils";
+
+
+const _mediaCache = new Map<string, MediaFile[]>();
+
+type MediaFile = { id: string; storage_path: string; mime_type: string; };
+
+function getStorageUrl(storagePath: string): string {
+  if (!SUPABASE_URL) return "";
+  return `${SUPABASE_URL}/storage/v1/object/public/signal-media/${storagePath}`;
+}
+
+async function prefetchMedia(signalId: string) {
+  if (_mediaCache.has(signalId)) return;
+  try {
+    const { data } = await supabase
+      .from("media_files")
+      .select("id, signal_id, storage_path, mime_type")
+      .eq("signal_id", signalId)
+      .order("created_at", { ascending: true });
+    _mediaCache.set(signalId, (data ?? []) as MediaFile[]);
+  } catch { /* silently fail */ }
+}
+
+function useMediaForSignal(signalId: string): { files: MediaFile[]; urls: string[] } {
+  const [media, setMedia] = useState({ files: _mediaCache.get(signalId) ?? [], urls: [] });
+
+  useEffect(() => {
+    const fetchAndUpdate = async () => {
+      // Pre-fetch the media for this signal if not already in cache
+      if (!_mediaCache.has(signalId)) {
+        try {
+          const { data } = await supabase
+            .from("media_files")
+            .select("id, signal_id, storage_path, mime_type")
+            .eq("signal_id", signalId)
+            .order("created_at", { ascending: true });
+          if (data) {
+            _mediaCache.set(signalId, data as MediaFile[]);
+          }
+        } catch { /* silently fail */ }
+      }
+      
+      const files = _mediaCache.get(signalId) ?? [];
+      const urls = files.map((f) => getStorageUrl(f.storage_path));
+      setMedia({ files, urls });
+    };
+
+    fetchAndUpdate();
+
+    // We can use a simple timer to recheck periodically since we don't have an event emitter
+    const interval = setInterval(fetchAndUpdate, 2000);
+
+    return () => clearInterval(interval);
+  }, [signalId]);
+
+  return media;
+}
 
 const STATE_LABEL = (reports: number, trust: number) => {
   if (reports >= 20) return { label: "Verified", color: "#D8F3DC", textColor: "#2D6A4F" };
@@ -29,15 +89,23 @@ export default function IncidentDetailScreen() {
   const { id } = route.params;
   const signals = useSignals();
   const signal = signals.find((s) => s.id === id);
+  const { files: mediaFiles, urls: mediaUrls } = useMediaForSignal(id);
   const [verifying, setVerifying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      prefetchMedia(id);
+    }
+  }, [id]);
 
   if (!signal) {
     return (
       <AppShell>
         <TopBar />
-        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("FeedTab"); }}>
-          <Text style={styles.back}><ArrowLeft size={14} color="#6B7280" /> Back to feed</Text>
+        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("MainTabs", { screen: "FeedTab" }); }} style={styles.backBtn}>
+          <ArrowLeft size={14} color="#6B7280" />
+          <Text style={styles.backText}>Back to feed</Text>
         </TouchableOpacity>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>This incident isn't in your local feed yet.</Text>
@@ -50,19 +118,25 @@ export default function IncidentDetailScreen() {
   const intensity = trustToIntensity(signal.trust);
 
   const verify = async () => {
+    lightTap();
     setVerifying(true);
     setErr(null);
     const r = await signalStore.verify(signal.id);
     setVerifying(false);
-    if (!r.ok) setErr(r.error ?? "Couldn't verify");
+    if (!r.ok) {
+      setErr(r.error ?? "Couldn't verify");
+    } else {
+      successNotify();
+    }
   };
 
   return (
     <AppShell>
       <TopBar />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("FeedTab"); }}>
-          <Text style={styles.back}><ArrowLeft size={14} color="#6B7280" /> Back</Text>
+        <TouchableOpacity onPress={() => { lightTap(); navigation.navigate("MainTabs", { screen: "FeedTab" }); }} style={styles.backBtn}>
+          <ArrowLeft size={14} color="#6B7280" />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
         <View style={styles.topRow}>
@@ -77,7 +151,7 @@ export default function IncidentDetailScreen() {
 
         <View style={styles.statsGrid}>
           <Stat icon={<MapPin size={14} color="#6B7280" />} label="Distance" value={`${signal.distanceKm.toFixed(1)} km`} />
-          <Stat icon={<Clock size={14} color="#6B7280" />} label="Reported" value={`${signal.minutesAgo}m ago`} />
+          <Stat icon={<Clock size={14} color="#6B7280" />} label="Reported" value={formatTimeAgo(signal.minutesAgo)} />
           <Stat icon={<Users size={14} color="#6B7280" />} label="Reports" value={String(signal.reports)} />
         </View>
 
@@ -105,16 +179,45 @@ export default function IncidentDetailScreen() {
             <Camera size={16} color="#6B7280" />
             <Text style={styles.cardTitle}>Media</Text>
           </View>
-          <Text style={styles.cardBody}>
-            {signal.media > 0 ? `${signal.media} photo/video attachments.` : "No media attached yet."}
-          </Text>
+          {mediaUrls.length > 0 ? (
+            <View style={styles.mediaGrid}>
+              {mediaUrls.map((url, index) => {
+                const isVideo = mediaFiles[index]?.mime_type?.startsWith("video/") ?? false;
+                if (isVideo) {
+                  return (
+                    <Video
+                      key={index}
+                      source={{ uri: url }}
+                      style={styles.mediaImage}
+                      resizeMode={Video.RESIZE_MODE_COVER}
+                      isLooping
+                      isMuted={true}
+                      shouldPlay
+                    />
+                  );
+                }
+                return (
+                  <Image
+                    key={index}
+                    source={{ uri: url }}
+                    style={styles.mediaImage}
+                    resizeMode="cover"
+                  />
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.cardBody}>
+              {signal.media > 0 ? `${signal.media} photo/video attachments.` : "No media attached yet."}
+            </Text>
+          )}
         </View>
 
         {/* Timeline */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Timeline</Text>
           <View style={styles.timeline}>
-            <TimelineItem icon={<AlertTriangle size={14} color="#6B7280" />} text="Initial report submitted" time={`${signal.minutesAgo}m ago`} />
+            <TimelineItem icon={<AlertTriangle size={14} color="#6B7280" />} text="Initial report submitted" time={formatTimeAgo(signal.minutesAgo)} />
             {signal.reports >= 3 && (
               <TimelineItem icon={<Users size={14} color="#6B7280" />} text={`${signal.reports - 1} corroborating reports`} time="now" />
             )}
@@ -164,7 +267,8 @@ function TimelineItem({ icon, text, time }: { icon: React.ReactNode; text: strin
 }
 
 const styles = StyleSheet.create({
-  back: { fontSize: 13, color: "#6B7280", marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 4 },
+  backBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 16 },
+  backText: { fontSize: 13, color: "#6B7280" },
   notFound: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 32, alignItems: "center" },
   notFoundText: { fontSize: 13, color: "#6B7280", textAlign: "center" },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
@@ -186,6 +290,8 @@ const styles = StyleSheet.create({
   verifyBtnText: { fontSize: 14, fontWeight: "600", color: "#FFFFFF" },
   errorText: { textAlign: "center", fontSize: 11, color: "#E63946", marginTop: 8 },
   card: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 16, marginTop: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  mediaImage: { width: "48%", height: 120, borderRadius: 12 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   cardTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
   cardBody: { fontSize: 12, color: "#6B7280" },

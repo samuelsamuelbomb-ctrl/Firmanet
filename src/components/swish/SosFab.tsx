@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { Siren } from "lucide-react";
-import { heavyTap } from "@/core/haptics";
+import { heavyTap } from "@/lib/haptics";
 
 export function SosFab() {
   const [pos, setPos] = useState(() => {

@@ -11,8 +11,15 @@ export type SignalCategory = "crime" | "fire" | "flood" | "accident" | "sos" | "
 
 export type SignalState = "unverified" | "emerging" | "high_confidence" | "verified";
 
+export interface MediaFile {
+  id: string;
+  storage_path: string;
+  mime_type: string;
+}
+
 export interface Signal {
   id: string;
+  author_id?: string;
   type: SignalType;
   category: SignalCategory;
   state: SignalState;
@@ -26,6 +33,18 @@ export interface Signal {
   description?: string;
   lat: number;
   lng: number;
+  created_at: string;
+  media_urls?: string[];
+  media_files?: MediaFile[];
+  // Computed fields
+  likes?: number;
+  comments?: number;
+  views?: number;
+  shares?: number;
+  total_watch_time_seconds?: number;
+  liked_by_user?: boolean;
+  confirms: number;
+  userConfirmed: boolean;
 }
 
 export type SponsorTier = "infrastructure" | "community" | "national";
@@ -38,6 +57,7 @@ export interface Sponsor {
   initials: string;
   accent: string;
   url?: string;
+  image_url?: string | null;
 }
 
 export interface SignalCluster {
@@ -106,4 +126,53 @@ export interface AppNotification {
     request_id?: string;
     from_user?: string;
   } | null;
+}
+
+// ========================================
+// NEW DATABASE TYPES
+// ========================================
+
+export interface Profile {
+  id: string;
+  display_name?: string;
+  avatar_url?: string;
+  location?: string;
+  trust_score: number;
+  created_at: string;
+  updated_at: string;
+  username?: string;
+}
+
+export interface SignalLike {
+  id: string;
+  signal_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface SignalComment {
+  id: string;
+  signal_id: string;
+  user_id: string;
+  text: string;
+  created_at: string;
+  // Joined fields
+  user?: Profile;
+}
+
+export interface SignalView {
+  id: string;
+  signal_id: string;
+  user_id: string;
+  watch_time_seconds: number;
+  completion_rate?: number;
+  created_at: string;
+}
+
+export interface UserPreferences {
+  id: string;
+  user_id: string;
+  category_interactions: Record<SignalCategory, number>;
+  view_history: string[];
+  updated_at: string;
 }

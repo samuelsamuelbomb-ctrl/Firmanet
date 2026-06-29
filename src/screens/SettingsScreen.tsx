@@ -2,28 +2,47 @@
  * SettingsScreen — Alert intensity, vibration, radius, quiet hours, sponsors.
  *
  * Ported from /routes/settings.tsx
- * All settings use local state (no server persistence).
+ * Settings are persisted to AsyncStorage and loaded on mount.
+ * Uses the shared settings store so all screens react to changes.
  */
 
-import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import Slider from "@react-native-community/slider";
 import { AppShell } from "../components/shared/AppShell";
 import { TopBar } from "../components/shared/TopBar";
-import { sponsors } from "../core/sponsors";
+import { useSponsors, useSponsorsBootstrap } from "../core/sponsorStore";
 import { Volume2, Vibrate, Radius, Moon, BellRing, Handshake } from "lucide-react-native";
 import { lightTap, selectionTick } from "../core/haptics";
+import { useSettingsStore } from "../core/settingsStore";
+import type { IntensityId } from "../core/settingsStore";
 
 const INTENSITIES = [
-  { id: "minimal",  label: "Minimal",  sub: "Only critical alerts",     color: "#2D6A4F" },
-  { id: "balanced", label: "Balanced", sub: "Recommended for most",     color: "#F59E0B" },
-  { id: "full",     label: "Full",     sub: "All verified signals",     color: "#E63946" },
+  { id: "minimal", label: "Minimal", sub: "Only critical alerts", color: "#2D6A4F" },
+  { id: "balanced", label: "Balanced", sub: "Recommended for most", color: "#F59E0B" },
+  { id: "full", label: "Full", sub: "All verified signals", color: "#E63946" },
 ] as const;
 
 export default function SettingsScreen() {
-  const [intensity, setIntensity] = useState<string>("balanced");
-  const [vibration, setVibration] = useState(70);
-  const [radius, setRadius] = useState(3);
-  const [quietHours, setQuietHours] = useState(true);
+  const intensity = useSettingsStore((s) => s.intensity);
+  const vibration = useSettingsStore((s) => s.vibration);
+  const radius = useSettingsStore((s) => s.radius);
+  const quietHours = useSettingsStore((s) => s.quietHours);
+  const loaded = useSettingsStore((s) => s.loaded);
+  const load = useSettingsStore((s) => s.load);
+  const setIntensity = useSettingsStore((s) => s.setIntensity);
+  const setVibration = useSettingsStore((s) => s.setVibration);
+  const setRadius = useSettingsStore((s) => s.setRadius);
+  const setQuietHours = useSettingsStore((s) => s.setQuietHours);
+  
+  const sponsors = useSponsors();
+  const { isBootstrapped: sponsorsBootstrapped, isLoading: sponsorsLoading, bootstrap: bootstrapSponsors } = useSponsorsBootstrap();
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    void load();
+    void bootstrapSponsors();
+  }, [load, bootstrapSponsors]);
 
   return (
     <AppShell>
@@ -43,7 +62,10 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={opt.id}
                 style={[styles.intensityOption, intensity === opt.id && { borderColor: opt.color, borderWidth: 2 }]}
-                onPress={() => { lightTap(); setIntensity(opt.id); }}
+                onPress={() => {
+                  lightTap();
+                  setIntensity(opt.id as IntensityId);
+                }}
               >
                 <View style={[styles.intensityBadge, { backgroundColor: opt.color + "30" }]}>
                   <Text style={[styles.intensityBadgeText, { color: opt.color }]}>{opt.label}</Text>
@@ -67,7 +89,10 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity
               style={[styles.toggle, quietHours && styles.toggleOn]}
-              onPress={() => { selectionTick(); setQuietHours((v) => !v); }}
+              onPress={() => {
+                selectionTick();
+                setQuietHours(!quietHours);
+              }}
             >
               <View style={[styles.toggleKnob, quietHours && styles.toggleKnobOn]} />
             </TouchableOpacity>
@@ -85,17 +110,32 @@ export default function SettingsScreen() {
           <Text style={styles.sponsorDesc}>
             Organizations supporting Nigeria's safety infrastructure. Sponsors never appear in active alerts or emergency flows.
           </Text>
-          {sponsors.map((s) => (
-            <View key={s.id} style={styles.sponsorCard}>
-              <View style={[styles.sponsorLogo, { backgroundColor: s.accent }]}>
-                <Text style={styles.sponsorInitials}>{s.initials}</Text>
-              </View>
-              <View>
-                <Text style={styles.sponsorName}>{s.name}</Text>
-                <Text style={styles.sponsorTagline}>{s.tagline}</Text>
-              </View>
+          {sponsorsLoading ? (
+            <View style={styles.sponsorLoadingContainer}>
+              <ActivityIndicator size="small" color="#2D6A4F" />
+              <Text style={styles.sponsorLoadingText}>Loading partners...</Text>
             </View>
-          ))}
+          ) : (
+            sponsors.map((s) => (
+              <View key={s.id} style={styles.sponsorCard}>
+                {s.image_url ? (
+                  <Image
+                    source={{ uri: s.image_url }}
+                    style={styles.sponsorLogo}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.sponsorLogo, { backgroundColor: s.accent }]}>
+                    <Text style={styles.sponsorInitials}>{s.initials}</Text>
+                  </View>
+                )}
+                <View>
+                  <Text style={styles.sponsorName}>{s.name}</Text>
+                  <Text style={styles.sponsorTagline}>{s.tagline}</Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </AppShell>
@@ -103,9 +143,21 @@ export default function SettingsScreen() {
 }
 
 function SliderRow({
-  icon, label, value, min = 0, max = 100, unit = "", onChange,
+  icon,
+  label,
+  value,
+  min = 0,
+  max = 100,
+  unit = "",
+  onChange,
 }: {
-  icon: React.ReactNode; label: string; value: number; min?: number; max?: number; unit?: string; onChange: (n: number) => void;
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+  onChange: (n: number) => void;
 }) {
   return (
     <View>
@@ -114,14 +166,41 @@ function SliderRow({
           {icon}
           <Text style={styles.sliderLabelText}>{label}</Text>
         </View>
-        <Text style={styles.sliderValue}>{value}{unit}</Text>
+        <Text style={styles.sliderValue}>
+          {value}
+          {unit}
+        </Text>
       </View>
       <View style={styles.sliderTrack}>
         <View style={[styles.sliderFill, { width: `${((value - min) / (max - min)) * 100}%` }]} />
       </View>
+      <Slider
+        style={styles.slider}
+        minimumValue={min}
+        maximumValue={max}
+        step={1}
+        value={value}
+        onValueChange={onChange}
+        minimumTrackTintColor="#2D6A4F"
+        maximumTrackTintColor="#E5E7EB"
+        thumbTintColor="#2D6A4F"
+      />
       <View style={styles.sliderTouchArea}>
-        {[min, Math.round((max - min) / 4 + min), Math.round((max - min) / 2 + min), Math.round(3 * (max - min) / 4 + min), max].map((v) => (
-          <TouchableOpacity key={v} style={styles.sliderStop} onPress={() => { selectionTick(); onChange(v); }}>
+        {[
+          min,
+          Math.round((max - min) / 4 + min),
+          Math.round((max - min) / 2 + min),
+          Math.round(3 * (max - min) / 4 + min),
+          max,
+        ].map((v) => (
+          <TouchableOpacity
+            key={v}
+            style={styles.sliderStop}
+            onPress={() => {
+              selectionTick();
+              onChange(v);
+            }}
+          >
             <View style={[styles.sliderDot, value >= v && styles.sliderDotActive]} />
           </TouchableOpacity>
         ))}
@@ -133,7 +212,17 @@ function SliderRow({
 const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
   sub: { fontSize: 13, color: "#6B7280", marginTop: 4, marginBottom: 20 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   cardTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Outfit", color: "#1A1A2E" },
   intensityGrid: { flexDirection: "row", gap: 8 },
@@ -148,6 +237,7 @@ const styles = StyleSheet.create({
   sliderValue: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   sliderTrack: { height: 6, borderRadius: 3, backgroundColor: "#E5E7EB", overflow: "hidden" },
   sliderFill: { height: "100%", borderRadius: 3, backgroundColor: "#2D6A4F" },
+  slider: { width: "100%", height: 40, marginTop: 8 },
   sliderTouchArea: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
   sliderStop: { padding: 4 },
   sliderDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#D1D5DB" },
@@ -166,4 +256,12 @@ const styles = StyleSheet.create({
   sponsorInitials: { fontSize: 10, fontWeight: "700", color: "#FFFFFF" },
   sponsorName: { fontSize: 13, fontWeight: "600", color: "#1A1A2E" },
   sponsorTagline: { fontSize: 11, color: "#6B7280" },
+  sponsorLoadingContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    gap: 8, 
+    paddingVertical: 20 
+  },
+  sponsorLoadingText: { fontSize: 13, color: "#6B7280" },
 });

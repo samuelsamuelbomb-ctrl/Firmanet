@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Shield, Mail, Lock, ArrowRight, User, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { lightTap, mediumTap } from "@/core/haptics";
+import { lightTap, mediumTap } from "@/lib/haptics";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({

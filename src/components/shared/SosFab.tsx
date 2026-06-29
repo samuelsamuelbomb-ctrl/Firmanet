@@ -4,18 +4,103 @@
  * Ported from src/components/swish/SosFab.tsx
  * Navigates to the SOS modal screen.
  * User can drag it around the screen — snaps to nearest edge on release.
+ *
+ * VISUAL UPDATE (Jun 2026):
+ *  - Icon matches the SOS tile: press-hold SVG instead of Siren
+ *  - Red matches the SOS tile: #E63E2B (was #E63946)
+ *  - Diffuse glow removed; replaced with a tight expanding ring (radar ping)
  */
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { TouchableOpacity, StyleSheet, View, PanResponder, Animated, Dimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Siren } from "lucide-react-native";
+import Svg, { Circle as SvgCircle, Path } from "react-native-svg";
 import { heavyTap } from "../../core/haptics";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const BTN_SIZE = 64;
 const EDGE_MARGIN = 16;
 
+// Exact red from the SOS tile
+const SOS_RED = "#E63E2B";
+
+// ── Custom SOS icon (press‑hold progress indicator) ────────
+function SosIcon({
+  size = 28,
+  color = "#FFFFFF",
+  strokeWidth = 2.4,
+}: {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Partial arc – reads as a hold‑progress ring */}
+      <Path
+        d="M12 2.5A9.5 9.5 0 0 1 21.5 12"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* Solid centre dot */}
+      <SvgCircle cx={12} cy={12} r={4.5} fill={color} />
+    </Svg>
+  );
+}
+
+// ── Expanding radar‑ping ring (replaces the old blurry glow) ──
+function PingRing() {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.0],
+  });
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.7, 0.3, 0],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        width: BTN_SIZE,
+        height: BTN_SIZE,
+        borderRadius: BTN_SIZE / 2,
+        borderWidth: 2,
+        borderColor: SOS_RED,
+        opacity,
+        transform: [{ scale }],
+      }}
+      pointerEvents="none"
+    />
+  );
+}
+
+// ── Component ──────────────────────────────────────────────
 export function SosFab() {
   const navigation = useNavigation<any>();
 
@@ -85,7 +170,13 @@ export function SosFab() {
   const handlePress = () => {
     if (!isDragging.current) {
       heavyTap();
-      navigation.navigate("SOS");
+      // SOS is in RootStack — navigate via parent
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate("SOS");
+      } else {
+        navigation.navigate("SOS");
+      }
     }
     isDragging.current = false;
   };
@@ -105,8 +196,8 @@ export function SosFab() {
         accessibilityLabel="Activate SOS"
         accessibilityRole="button"
       >
-        <View style={styles.pulseRing} />
-        <Siren size={28} color="#FFFFFF" strokeWidth={2.4} />
+        <SosIcon size={28} color="#FFFFFF" strokeWidth={2.4} />
+        <PingRing />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -125,20 +216,9 @@ const styles = StyleSheet.create({
     width: BTN_SIZE,
     height: BTN_SIZE,
     borderRadius: BTN_SIZE / 2,
-    backgroundColor: "#E63946",
+    backgroundColor: SOS_RED,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#E63946",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 10,
-  },
-  pulseRing: {
-    position: "absolute",
-    width: BTN_SIZE,
-    height: BTN_SIZE,
-    borderRadius: BTN_SIZE / 2,
-    backgroundColor: "rgba(230, 57, 70, 0.4)",
+    // No diffuse shadow — replaced by the animated PingRing
   },
 });

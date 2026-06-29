@@ -180,7 +180,7 @@ export default function ProfileScreen() {
         {/* Notifications link */}
         <TouchableOpacity
           style={styles.navCard}
-          onPress={() => navigation.navigate("Notifications")}
+          onPress={() => navigation.navigate("MainStack", { screen: "Notifications" })}
         >
           <BellRing size={16} color="#1A1A2E" />
           <Text style={styles.navText}>Notifications</Text>

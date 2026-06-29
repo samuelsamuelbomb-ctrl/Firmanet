@@ -25,6 +25,7 @@ export const sponsors: Sponsor[] = [
     tier: "infrastructure",
     initials: "MTN",
     accent: "#FF8C42",
+    image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/MTN_Group_Logo.svg/200px-MTN_Group_Logo.svg.png",
   },
   {
     id: "gtb",

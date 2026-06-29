@@ -1,5 +1,5 @@
 import { Link, type LinkProps } from "@tanstack/react-router";
-import { lightTap } from "@/core/haptics";
+import { lightTap } from "@/lib/haptics";
 
 export function SectionHeader({
   title,

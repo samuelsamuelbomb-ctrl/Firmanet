@@ -11,8 +11,10 @@
  */
 
 import { ReactNode } from "react";
-import { View, StyleSheet, SafeAreaView, StatusBar } from "react-native";
+import { View, StyleSheet, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { SosFab } from "./SosFab";
+import { MediaViewerProvider } from "./MediaViewer";
 
 interface AppShellProps {
   children: ReactNode;
@@ -22,13 +24,15 @@ interface AppShellProps {
 
 export function AppShell({ children, hideSos = false }: AppShellProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7F8FB" />
-      <View style={styles.container}>
-        {children}
-      </View>
-      {!hideSos && <SosFab />}
-    </SafeAreaView>
+    <MediaViewerProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F7F8FB" />
+        <View style={styles.container}>
+          {children}
+        </View>
+        {!hideSos && <SosFab />}
+      </SafeAreaView>
+    </MediaViewerProvider>
   );
 }
 

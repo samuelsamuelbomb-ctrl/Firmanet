@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Shield, Users, Radar, Sparkles, Siren, ChevronRight } from "lucide-react-native";
 import { sponsors } from "../core/sponsors";

@@ -18,6 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./src/context/AuthContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { useSignalStore } from "./src/core/signalStore";
+import { useSettingsStore } from "./src/core/settingsStore";
 import { setupSupabaseAppStateListener } from "./src/core/supabase";
 import { useFCM, createNotificationChannels } from "./src/services/notifications";
 import type { PushNotificationData } from "./src/services/notifications";
@@ -30,6 +31,7 @@ const queryClient = new QueryClient();
  */
 function AppBootstrapper({ children }: { children: React.ReactNode }) {
   const bootstrap = useSignalStore((s) => s.bootstrap);
+  const loadSettings = useSettingsStore((s) => s.load);
   const navigation = useNavigation<any>();
 
   // Handle push notification taps → navigate to relevant screen
@@ -63,10 +65,12 @@ function AppBootstrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Bootstrap signals from Supabase once per session
     void bootstrap();
+    // Load persisted settings from AsyncStorage
+    void loadSettings();
     // Setup Supabase auto-refresh on app foreground
     const cleanup = setupSupabaseAppStateListener();
     return cleanup;
-  }, [bootstrap]);
+  }, [bootstrap, loadSettings]);
 
   // Init FCM
   useFCM(handleNotificationOpened);

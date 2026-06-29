@@ -1,46 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { AppShell } from "@/components/swish/AppShell";
 import { TopBar } from "@/components/swish/TopBar";
 import { Volume2, Vibrate, Moon, Radius, BellRing } from "lucide-react";
 import { Handshake } from "lucide-react";
 import { SponsorCard } from "@/components/swish/SponsorCard";
-import { sponsors } from "@/lib/sponsors";
-
-const SETTINGS_KEY = "firmanet-settings";
-
-type IntensityId = "minimal" | "balanced" | "full";
-
-interface Settings {
-  intensity: IntensityId;
-  vibration: number;
-  radius: number;
-  quietHours: boolean;
-}
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return JSON.parse(raw) as Settings;
-  } catch { /* ignore */ }
-  return { intensity: "balanced", vibration: 70, radius: 3, quietHours: true };
-}
-
-function saveSettings(s: Settings) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  } catch { /* ignore */ }
-}
-
-export const Route = createFileRoute("/settings")({
-  head: () => ({
-    meta: [
-      { title: "Firmanet — Settings" },
-      { name: "description", content: "Tune alert intensity, vibration, quiet hours and radius sensitivity." },
-    ],
-  }),
-  component: SettingsPage,
-});
+import { useSponsors, useSponsorsBootstrap } from "@/lib/sponsorStore";
+import { useSettingsStore, useIntensity, useVibration, useRadius, useQuietHours } from "@/lib/settingsStore";
 
 const INTENSITIES = [
   {
@@ -66,28 +32,48 @@ const INTENSITIES = [
   },
 ] as const;
 
+export const Route = createFileRoute("/settings")({
+  head: () => ({
+    meta: [
+      { title: "Firmanet — Settings" },
+      { name: "description", content: "Tune alert intensity, vibration, quiet hours and radius sensitivity." },
+    ],
+  }),
+  component: SettingsPage,
+});
+
 function SettingsPage() {
-  const [intensity, setIntensity] = useState<(typeof INTENSITIES)[number]["id"]>("balanced");
-  const [vibration, setVibration] = useState(70);
-  const [radius, setRadius] = useState(3);
-  const [quietHours, setQuietHours] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const load = useSettingsStore((s) => s.load);
+  const setIntensity = useSettingsStore((s) => s.setIntensity);
+  const setVibration = useSettingsStore((s) => s.setVibration);
+  const setRadius = useSettingsStore((s) => s.setRadius);
+  const setQuietHours = useSettingsStore((s) => s.setQuietHours);
+  
+  const intensity = useIntensity();
+  const vibration = useVibration();
+  const radius = useRadius();
+  const quietHours = useQuietHours();
+  const loaded = useSettingsStore((s) => s.loaded);
+  
+  const sponsors = useSponsors();
+  const { isBootstrapped: sponsorsBootstrapped, isLoading: sponsorsLoading, bootstrap: bootstrapSponsors } = useSponsorsBootstrap();
 
   // Load persisted settings on mount
   useEffect(() => {
-    const s = loadSettings();
-    setIntensity(s.intensity);
-    setVibration(s.vibration);
-    setRadius(s.radius);
-    setQuietHours(s.quietHours);
-    setLoaded(true);
-  }, []);
+    void load();
+    void bootstrapSponsors();
+  }, [load, bootstrapSponsors]);
 
-  // Persist whenever a value changes and we've loaded from storage
-  useEffect(() => {
-    if (!loaded) return;
-    saveSettings({ intensity, vibration, radius, quietHours });
-  }, [intensity, vibration, radius, quietHours, loaded]);
+  if (!loaded) {
+    return (
+      <AppShell>
+        <TopBar />
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading settings...</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -106,7 +92,7 @@ function SettingsPage() {
             {INTENSITIES.map((opt) => (
               <button
                 key={opt.id}
-                onClick={() => setIntensity(opt.id)}
+                onClick={() => setIntensity(opt.id as any)}
                 className={`rounded-2xl p-3 text-left transition-all ${
                   intensity === opt.id ? `ring-2 ${opt.ring} bg-surface` : "bg-muted/40"
                 }`}
@@ -152,7 +138,7 @@ function SettingsPage() {
               <Moon className="h-4 w-4" /> Quiet hours
             </span>
             <button
-              onClick={() => setQuietHours((v) => !v)}
+              onClick={() => setQuietHours(!quietHours)}
               className={`h-7 w-12 rounded-full transition-colors ${
                 quietHours ? "bg-primary" : "bg-muted"
               }`}
@@ -180,9 +166,16 @@ function SettingsPage() {
             in active alerts or emergency flows.
           </p>
           <div className="mt-4 space-y-2">
-            {sponsors.map((s) => (
-              <SponsorCard key={s.id} sponsor={s} />
-            ))}
+            {sponsorsLoading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                Loading partners...
+              </div>
+            ) : (
+              sponsors.map((s) => (
+                <SponsorCard key={s.id} sponsor={s} />
+              ))
+            )}
           </div>
         </section>
       </div>

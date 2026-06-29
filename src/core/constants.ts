@@ -17,5 +17,11 @@ export const EMERGING_REPORT_THRESHOLD = 3;
 
 export const INTENSITY_CYCLE: Intensity[] = ["calm", "warn", "danger"];
 
+/**
+ * Default map center for Ikeja, Lagos, Nigeria.
+ * Used as fallback when user location is unavailable.
+ */
+export const IKEJA_CENTER = { lat: 6.6018, lng: 3.3515 };
+
 // Re-export type needed for the array above
 import type { Intensity } from "./types";

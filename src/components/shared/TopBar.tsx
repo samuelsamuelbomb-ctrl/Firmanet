@@ -4,11 +4,11 @@
  * Ported from src/components/swish/TopBar.tsx
  *
  * Navigation:
- *   - Bell → navigates to "Notifications" (MainStack, auth-guarded)
- *   - Profile → navigates to "Profile" (MainStack, auth-guarded)
+ *   - Bell → navigates to "MainStack" → "Notifications" (auth-guarded)
+ *   - Profile → navigates to "MainStack" → "Profile" (auth-guarded)
  */
 
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useState, useEffect } from "react";
 import { MapPin, Bell, User } from "lucide-react-native";
@@ -24,41 +24,57 @@ export function TopBar({
   hideProfile = false,
 }: TopBarProps) {
   const [displayLocation, setDisplayLocation] = useState("Getting location…");
-
-  // Get real location on mount
-  useEffect(() => {
-    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          // Try reverse geocoding via Mapbox if token available
-          const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
-          if (token) {
-            fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,neighborhood&limit=1`,
-            )
-              .then((r) => r.json())
-              .then((data) => {
-                if (data?.features?.[0]?.place_name) {
-                  setDisplayLocation(data.features[0].place_name);
-                } else {
-                  setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-                }
-              })
-              .catch(() => setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`));
-          } else {
-            setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          }
-        },
-        () => setDisplayLocation("Current Location"),
-        { enableHighAccuracy: true, timeout: 10_000 },
-      );
-    } else {
-      setDisplayLocation("Current Location");
-    }
-  }, []);
   const navigation = useNavigation<any>();
+
+  // Get real location on mount via expo-location
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { getCurrentPositionAsync, requestForegroundPermissionsAsync } = await import("expo-location");
+        const { status } = await requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setDisplayLocation("Current Location");
+          return;
+        }
+        const pos = await getCurrentPositionAsync({});
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        // Read Mapbox token — try process.env first, then fall back to expo-constants (Expo Go)
+        let token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+        if (!token) {
+          try {
+            const Constants = require("expo-constants");
+            token = Constants?.expoConfig?.extra?.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
+          } catch {}
+        }
+
+        if (token) {
+          try {
+            // Use address type to get street-level results
+            const res = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=address,locality,place,neighborhood,poi&limit=1`,
+            );
+            const data = await res.json();
+            if (data?.features?.[0]?.place_name) {
+              setDisplayLocation(data.features[0].place_name);
+              return;
+            }
+          } catch {
+            // fallback to coordinates
+          }
+        }
+        setDisplayLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      } catch {
+        setDisplayLocation("Current Location");
+      }
+    })();
+  }, []);
+
+  const navigateTo = (screen: string) => {
+    lightTap();
+    navigation.navigate("MainStack", { screen });
+  };
 
   return (
     <View style={styles.container}>
@@ -66,14 +82,14 @@ export function TopBar({
         <Logo size={28} />
         <TouchableOpacity style={styles.locationPill} activeOpacity={0.7}>
           <MapPin size={14} color="#2D6A4F" strokeWidth={2.5} />
-          <Text style={styles.locationText}>{displayLocation}</Text>
+          <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.right}>
         {!hideBell && (
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => { lightTap(); navigation.navigate("Notifications"); }}
+            onPress={() => navigateTo("Notifications")}
             accessibilityLabel="Notifications"
           >
             <Bell size={18} color="#1A1A2E" />
@@ -83,7 +99,7 @@ export function TopBar({
         {!hideProfile && (
           <TouchableOpacity
             style={styles.profileButton}
-            onPress={() => { lightTap(); navigation.navigate("Profile"); }}
+            onPress={() => navigateTo("Profile")}
             accessibilityLabel="Profile"
           >
             <User size={18} color="#FFFFFF" />
@@ -96,9 +112,10 @@ export function TopBar({
 
 function Logo({ size }: { size: number }) {
   return (
-    <View style={[styles.logo, { width: size, height: size, borderRadius: size / 4 }]}>
-      <Text style={[styles.logoText, { fontSize: size * 0.5 }]}>F</Text>
-    </View>
+    <Image
+      source={require("../../assets/firmanet-logo.png")}
+      style={{ width: size, height: size, borderRadius: size / 4 }}
+    />
   );
 }
 
@@ -114,6 +131,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 1,
+    maxWidth: "72%",
   },
   logo: {
     backgroundColor: "#D8F3DC",
@@ -137,11 +156,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 3,
+    flexShrink: 1,
+    overflow: "hidden",
   },
   locationText: {
     fontSize: 12,
     fontWeight: "500",
     color: "#1A1A2E",
+    flexShrink: 1,
   },
   right: {
     flexDirection: "row",
