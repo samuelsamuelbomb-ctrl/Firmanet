@@ -15,4 +15,14 @@ export default defineConfig({
   nitro: {
     preset: "vercel",
   },
+  vite: {
+    resolve: {
+      alias: {
+        "react-native": "react-native-web",
+      },
+    },
+    optimizeDeps: {
+      exclude: ["react-native", "react-native-web"],
+    },
+  },
 });
